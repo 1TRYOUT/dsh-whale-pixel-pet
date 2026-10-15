@@ -316,7 +316,7 @@ $env:DSH_PET_ELECTRON = 'D:\somewhere\electron.exe'
 │  ├─ webp-size.mjs          # 读 WebP 尺寸（零依赖，用于算缩放）
 │  └─ asar-read.mjs          # 只读 asar 工具（查 DSH 自身实现用）
 ├─ docs/dsh-client-plugin-contract.md   # DSH 客户端插件契约（逐条带源码行号）
-└─ shots/                    # 截图证据
+└─ docs/screenshots/                    # 截图证据
 ```
 
 ---
