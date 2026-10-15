@@ -437,6 +437,10 @@ Token 成长与升级、零侵入（`pointer-events`）、三区命中判定、�
 
 ## 许可
 
+代码 MIT（见 `LICENSE`）；角色立绘是第三方 MIT 资源，署名与授权全文见 `THIRD-PARTY.md`。
+
+## 许可（原）
+
 本项目代码 MIT。
 
 **第三方美术资源**：`assets/art/musume/*.webp`（92 张插画立绘）来自

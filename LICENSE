@@ -19,12 +19,3 @@ AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
 LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
-
---------------------------------------------------------------------------
-Third-party assets
---------------------------------------------------------------------------
-The character sprites under assets/art/musume/ come from the project
-dsh-whale-musume by Sutera-Diffusus, used under the MIT License.
-See assets/art/ATTRIBUTION.md and assets/art/LICENSE-dsh-whale-musume.txt.
-If you remove assets/art/, the pet falls back to its built-in pixel renderer
-and keeps working.
