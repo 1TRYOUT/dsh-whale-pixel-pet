@@ -1,0 +1,335 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<title>鲸鱼娘 · 宿主联动集成测试</title>
+<link rel="stylesheet" href="../assets/whale-pet.css">
+<style>
+  html, body { margin: 0; height: 100%; overflow: hidden; background: #101a26; color: #cfe0ff;
+    font: 13px/1.5 Consolas, "Microsoft YaHei", monospace; }
+  #fake-host { position: absolute; inset: 0; pointer-events: none; opacity: 0; }
+  #result { position: absolute; left: 14px; top: 10px; right: 300px; white-space: pre;
+    font-size: 12.5px; line-height: 1.45; column-count: 2; column-gap: 26px; }
+  .ok { color: #7fe0a0; }
+  .bad { color: #ff8080; }
+  .dim { color: #6f8aa8; }
+  #err { position: absolute; right: 10px; top: 10px; width: 280px; color: #ffb4b4; font-size: 12px; white-space: pre-wrap; }
+</style>
+</head>
+<body>
+<div id="fake-host"></div>
+<pre id="result">running…</pre>
+<pre id="err"></pre>
+
+<script>
+  window.addEventListener('error', function (e) {
+    var el = document.getElementById('err');
+    if (el) el.textContent += '[JS ERROR] ' + e.message + '\n  at line ' + (e.lineno || 0) + '\n';
+  });
+</script>
+<script src="../assets/whale-pet.js"></script>
+<script src="../assets/pet-actions.js"></script>
+<script src="../assets/host-signal.js"></script>
+<script src="../assets/art-musume.js"></script>
+<script src="../assets/whale-pet-overlay.js"></script>
+<script>
+(function () {
+  var out = [], pass = 0, fail = 0;
+
+  function emit(line, cls) { out.push({ t: line, c: cls || 'dim' }); }
+  function trace(label) {
+    var w = watcher.read();
+    emit('# ' + label + ' | watch=' + w.state + ' tools=' + w.toolCount + ' run=' + w.runningCount +
+      ' | mode=' + overlay.pet.mode + ' amb=' + overlay.pet.ambient + ' pose=' + overlay.pet.pose);
+  }
+  function check(name, cond, extra) {
+    if (cond) { pass++; emit('PASS  ' + name, 'ok'); }
+    else { fail++; emit('FAIL  ' + name + (extra !== undefined ? '  → ' + extra : ''), 'bad'); }
+  }
+  function flush() {
+    document.getElementById('result').innerHTML = out.map(function (l) {
+      return '<span class="' + l.c + '">' + l.t.replace(/[<>&]/g, function (c) {
+        return { '<': '&lt;', '>': '&gt;', '&': '&amp;' }[c];
+      }) + '</span>';
+    }).join('\n') + '\n\n' + (fail === 0 ? 'ALL PASS (' + pass + ')' : 'FAILED ' + fail + ' / ' + (pass + fail));
+    document.title = fail === 0 ? 'ALL PASS' : 'FAILED ' + fail;
+  }
+
+  /** 机器可校验出口：无头运行时用 --enable-logging=stderr 采集这一行 */
+  function verdict() {
+    var line = fail === 0 ? ('ALL PASS (' + pass + ')') : ('FAILED ' + fail + ' / ' + (pass + fail));
+    console.log('[mock-host] RESULT: ' + line);
+    out.forEach(function (l) { if (l.c === 'bad') console.log('[mock-host] ' + l.t); });
+  }
+
+  var host = document.getElementById('fake-host');
+  function setHost(html) { host.innerHTML = html; }
+
+  var overlay = window.WhalePetOverlay.createOverlay({
+    storageKey: 'whale-pet:mock',
+    assetBase: '../assets/',                 // 立绘资源走相对路径（演示/测试用）
+    config: { sound: false, name: '小汐', art: 'musume', guiPet: true },
+    win: window, doc: document
+  });
+  overlay.load = function () { return this; };
+  overlay.save = function () { return {}; };
+  overlay.mount();
+  function pet() { return overlay.pet; }   // 永远取当前那一只（重置命令会换新对象）
+
+  var tokens = 0;
+  var watcher = window.WhalePetHostSignal.createWatcher({
+    doc: document,
+    interval: 999999,                       // 手动 tick，保证确定性
+    onState: function (s) { pet().signal(s); },
+    onTokens: function (n) { tokens += n; pet().addTokens(n); }
+  });
+
+  function settle(seconds) {
+    var steps = Math.round((seconds || 0.05) * 60);
+    for (var i = 0; i < steps; i++) pet().update(1 / 60);
+  }
+  function clearPin() { settle(10); }
+
+  /* ============ 1. 忙闲联动：DSH 真实 DOM 标记 ============ */
+  emit('=== 1. 忙闲联动（DOM 标记） ===');
+  setHost(''); watcher.tick(); settle();
+  trace('空 DOM');
+  check('空闲时是待机姿势', pet().pose === 'idle', pet().pose);
+
+  setHost('<div data-chat-running></div>'); watcher.tick(); settle();
+  trace('data-chat-running');
+  check('会话在跑 → 思考', pet().pose === 'think', pet().pose);
+
+  setHost('<div data-chat-running></div><div data-tool="pwsh" data-state="running"></div>'); watcher.tick(); settle();
+  trace('tool running');
+  check('工具有动作 → 干活', pet().pose === 'work', pet().pose);
+
+  setHost('<div data-tool="fs" data-state="ok"></div>'); watcher.tick(); clearPin();
+  trace('tool ok（已完成卡片）');
+  check('完成态工具卡不算忙', pet().pose === 'idle', pet().pose);
+
+  setHost('<div data-approval-key="approve-1"></div>'); watcher.tick(); settle();
+  trace('data-approval-key');
+  check('待审批 → 待审批姿势', pet().pose === 'approve', pet().pose);
+
+  setHost('<div data-tool="pwsh" data-state="error"></div>'); watcher.tick(); settle();
+  trace('tool error');
+  check('工具报错 → 难过姿势', pet().pose === 'sad', pet().pose);
+
+  // 失败记录会一直留在对话里，但后面成功过一次就说明已经恢复，
+  // 否则她会因为很久以前的一次失败永远蔫着。
+  setHost('<div data-tool="pwsh" data-state="error"></div><div data-tool="edit" data-state="ok"></div>');
+  watcher.tick();
+  check('错误后面出现过成功 → 状态不再算出错', pet().ambient !== 'error', pet().ambient);
+  clearPin();
+  check('……且姿势不会一直蔫着', pet().pose !== 'sad', pet().pose);
+  trace('error 之后又有 ok');
+
+  setHost('<div data-tool="edit" data-state="ok"></div><div data-tool="pwsh" data-state="error"></div>');
+  watcher.tick(); settle();
+  check('最新的工具失败 → 仍然难过', pet().pose === 'sad', pet().pose);
+  trace('ok 之后又是 error');
+
+  setHost('<div data-tool="pwsh" data-state="error"></div><div data-tool="pwsh" data-state="running"></div>');
+  watcher.tick();
+  check('错误后又有工具在跑 → 状态回到干活', pet().ambient === 'working', pet().ambient);
+  clearPin();
+  check('……姿势也回到干活', pet().pose === 'work', pet().pose);
+  trace('error 之后正在跑');
+
+  setHost('<div data-terminal data-running></div>'); watcher.tick(); settle();
+  trace('terminal running');
+  check('终端在跑 → 干活', pet().pose === 'work', pet().pose);
+
+  setHost(''); watcher.tick(); settle(0.6);
+  trace('清空信号 0.6s');
+  check('工作态在信号瞬断期间不抽搐', pet().pose === 'work', pet().pose);
+  clearPin();
+  trace('清空信号 + 等过钉住期');
+  check('钉住期结束后回到待机', pet().pose === 'idle', pet().pose);
+
+  /* ============ 2. 结构化信号（会话状态服务） ============ */
+  emit('');
+  emit('=== 2. 结构化信号优先 ===');
+  var liveMap = new Map();
+  var fakeCtx = {
+    get: function (key) {
+      if (key !== 'uiSession') return undefined;
+      return { sessionStatus: { getSnapshot: function () { return liveMap; } } };
+    }
+  };
+  var probe = window.WhalePetHostSignal.probeFromContext(fakeCtx);
+  check('能从客户端上下文取到结构化信号', typeof probe === 'function');
+  watcher.setStructured(probe);
+
+  liveMap.set('s1', { running: true, pendingInteraction: false });
+  setHost(''); watcher.tick(); clearPin(); watcher.tick(); settle();
+  trace('结构化 running');
+  check('结构化：会话在跑 → 思考', pet().pose === 'think', pet().pose);
+
+  liveMap.set('s1', { running: true, pendingInteraction: true });
+  watcher.tick(); settle();
+  trace('结构化 pendingInteraction');
+  check('结构化：等待确认 → 待审批', pet().pose === 'approve', pet().pose);
+
+  liveMap.set('s1', { running: false, pendingInteraction: false });
+  watcher.tick(); clearPin();
+  trace('结构化空地');
+  check('结构化：全部空闲 → 待机', pet().pose === 'idle', pet().pose);
+
+  watcher.setStructured(null);
+  setHost('<div data-chat-running></div>'); watcher.tick(); settle();
+  trace('无结构化信号，回落 DOM');
+  check('缺少结构化信号时退回 DOM 探测', pet().pose === 'think', pet().pose);
+  watcher.setStructured(probe);
+  liveMap.set('s1', { running: false, pendingInteraction: false });
+  setHost(''); watcher.tick(); clearPin();
+
+  /* ============ 3. Token 用量 → 成长 ============ */
+  emit('');
+  emit('=== 3. Token 用量养成 ===');
+  var t0 = tokens;
+  setHost('<div data-usage="10000"></div>'); watcher.tick();
+  setHost('<div data-usage="90000"></div>'); watcher.tick(); settle();
+  check('读到用量标记后开始成长', tokens > t0, t0 + ' → ' + tokens);
+  check('Token 同时喂饱她', pet().tokens > 0, 'pet.tokens=' + Math.round(pet().tokens));
+
+  var t1 = tokens;
+  setHost('<div data-tool="fs" data-state="running"></div><div data-tool="pwsh" data-state="running"></div>'); watcher.tick();
+  setHost('<div data-tool="fs" data-state="ok"></div><div data-tool="pwsh" data-state="ok"></div>'); watcher.tick();
+  check('无用量标记时按完成的工具数估值', tokens > t1, t1 + ' → ' + tokens);
+
+  var lv = pet().level;
+  pet().addTokens(pet().expNeed() * 400 + 50);
+  check('Token 足够会升级', pet().level > lv, 'Lv.' + lv + ' → Lv.' + pet().level);
+
+  /* ============ 4. 零侵入与交互 ============ */
+  emit('');
+  emit('=== 4. 零侵入与交互 ===');
+  var root = document.querySelector('[data-dsh-whale-pet-root]');
+  check('悬浮层已挂载', !!root);
+  check('整层 pointer-events:none', root && getComputedStyle(root).pointerEvents === 'none');
+  check('canvas 不吞事件', root && getComputedStyle(root.querySelector('canvas')).pointerEvents === 'none');
+
+  var u = pet().unit();
+  check('摸头命中 head', pet().hitZone(pet().x, pet().y - 20 * u) === 'head');
+  check('摸肚子命中 belly', pet().hitZone(pet().x, pet().y - 8 * u) === 'belly');
+  check('点空白不命中', pet().hitZone(pet().x + 800, pet().y - 8 * u) === null);
+
+  pet().hunger = 40;
+  var hunger = pet().hunger;
+  overlay.doAction('feed');
+  check('投喂：饱食度上升 + 进食姿势', pet().hunger > hunger && pet().pose === 'eat', pet().pose + ' hunger=' + pet().hunger);
+
+  var bond = pet().bond;
+  pet()._patCooldown = 0;
+  overlay.doAction('pat');
+  check('摸摸：亲密度上升 + 开心姿势', pet().bond > bond && pet().pose === 'happy', pet().pose);
+
+  overlay.doAction('praise');
+  check('夸夸：庆祝姿势', pet().pose === 'levelup', pet().pose);
+  overlay.doAction('sleep');
+  check('睡觉：蜷睡姿势', pet().pose === 'sleep', pet().pose);
+  overlay.doAction('sleep');
+
+  pet().onKeyTap();
+  check('键盘联动：抬手动画', pet().tapAnim > 0.9);
+
+  /* ============ 5. 设置面板命令 ============ */
+  emit('');
+  emit('=== 5. 设置面板命令 ===');
+  pet().x = 40;
+  window.dispatchEvent(new CustomEvent('whale-pet:command', { detail: { cmd: 'home' } }));
+  check('回原位：送到右侧', pet().x > pet().view.w * 0.5, 'x=' + Math.round(pet().x));
+
+  pet().level = 99;
+  window.dispatchEvent(new CustomEvent('whale-pet:command', { detail: { cmd: 'reset' } }));
+  check('重置养成数据', pet().level === 1, 'Lv.' + pet().level);
+
+  window.dispatchEvent(new CustomEvent('whale-pet:command', { detail: { cmd: 'hide' } }));
+  check('隐藏后留下唤回按钮', overlay.cfg.hidden === true && overlay.recallEl.style.display === 'flex');
+  window.dispatchEvent(new CustomEvent('whale-pet:command', { detail: { cmd: 'show' } }));
+  check('唤回桌宠', overlay.cfg.hidden === false);
+
+  overlay.toggle('followCursor');
+  check('开关：跟随鼠标可切换', pet().followCursor === false);
+  overlay.setSkin('coral');
+  check('换装：皮肤可切换', pet().skin === 'coral', pet().skin);
+  overlay.setSkin('deep');
+
+  /* ============ 6. 拖动与惯性 ============ */
+  emit('');
+  emit('=== 6. 拖动与惯性 ===');
+  pet().startDrag(pet().x, pet().y);
+  check('拖动：被拎起姿势', pet().pose === 'drag', pet().pose);
+  pet().dragTo(pet().x - 260, pet().y - 120, 1 / 60);
+  pet().endDrag();
+  settle(6);
+  check('松手后回落到地面', Math.abs(pet().y - pet().floorY()) < 2, 'y=' + Math.round(pet().y) + ' floor=' + pet().floorY());
+  check('落地点没有飞出屏幕', pet().x > 20 && pet().x < overlay.win.innerWidth - 20, 'x=' + Math.round(pet().x));
+
+  /* 收尾：截图里能看到她 */
+  setHost('<div data-chat-running></div><div data-tool="pwsh" data-state="running"></div>');
+  watcher.tick();
+  pet().say('联动测试通过～', 60);
+  settle(0.3);
+  overlay.start();
+  flush();
+
+  /* ============ 7. 插画立绘美术层（要等图片真的加载完，所以放到异步） ============ */
+  emit('');
+  emit('=== 7. 插画立绘美术层 ===');
+  check('画风为插画立绘', overlay.stats().art === 'musume', overlay.stats().art);
+  check('美术层已挂到宠物上', !!pet().art);
+  check('立绘还没加载完时，render 不抛错（会回退像素层）', (function () {
+    try { pet().render(overlay.ctx); return true; } catch (e) { return false; }
+  })());
+
+  setTimeout(function () {
+    try {
+      var st = overlay.artStatus();
+      check('立绘资源已开始加载（' + st.loaded + '/' + st.total + '）', st.total > 0, JSON.stringify(st));
+      check('常用姿势已就绪', st.loaded >= 5, '已载入 ' + st.loaded);
+      check('当前姿势有对应立绘且已就绪', st.ready === true, String(st.file));
+      check('干活时按工具类型选了专用立绘', /work-deploy|work-debug|work-review|state-tool/.test(String(st.file)), String(st.file));
+
+      // 真的画到画布上了吗？劫持 drawImage 计数（file:// 下图片会污染 canvas，
+      // getImageData 会抛安全错误，所以用调用计数做判据，像素采样只作补充）
+      var drew = 0;
+      var orig = overlay.ctx.drawImage;
+      overlay.ctx.drawImage = function () { drew++; return orig.apply(overlay.ctx, arguments); };
+      overlay.pet.render(overlay.ctx);
+      overlay.ctx.drawImage = orig;
+      check('立绘确实被画上去了（drawImage 被调用）', drew === 1, 'drawImage × ' + drew);
+
+      try {
+        var d = overlay.ctx.getImageData(Math.round(overlay.pet.x), Math.round(overlay.pet.y - 60), 1, 1).data;
+        check('画布该处像素不透明（补充判据）', d[3] > 8, 'alpha=' + d[3]);
+      } catch (e) {
+        emit('# 画布被 file:// 图片污染，跳过像素采样（同源 http 下可读）');
+      }
+
+      // 运行时切画风
+      overlay.setArtStyle('pixel');
+      check('能切回像素画风', overlay.stats().art === 'pixel' && pet().art === null, overlay.stats().art);
+      var drew2 = 0;
+      var orig2 = overlay.ctx.drawImage;
+      overlay.ctx.drawImage = function () { drew2++; return orig2.apply(overlay.ctx, arguments); };
+      var fr = 0, ofr = overlay.ctx.fillRect;
+      overlay.ctx.fillRect = function () { fr++; return ofr.apply(overlay.ctx, arguments); };
+      overlay.pet.render(overlay.ctx);
+      overlay.ctx.drawImage = orig2;
+      overlay.ctx.fillRect = ofr;
+      check('像素画风走的是像素渲染器（fillRect 有调用、drawImage 没有）', fr > 50 && drew2 === 0, 'fillRect × ' + fr + ' / drawImage × ' + drew2);
+      overlay.setArtStyle('musume');
+      check('能再切回插画立绘', overlay.stats().art === 'musume' && !!pet().art, overlay.stats().art);
+    } catch (e) {
+      check('立绘层断言未抛错', false, String((e && e.message) || e));
+    }
+    flush();
+    verdict();
+  }, 2500);
+})();
+</script>
+</body>
+</html>

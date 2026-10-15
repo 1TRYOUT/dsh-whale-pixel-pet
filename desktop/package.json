@@ -1,0 +1,8 @@
+{
+  "name": "dsh-whale-pet-desktop",
+  "version": "1.0.0",
+  "private": true,
+  "description": "鲸鱼娘桌宠 · 独立桌面窗口（透明置顶、可放在桌面任意位置，盖在所有程序之上）",
+  "main": "main.js",
+  "license": "MIT"
+}

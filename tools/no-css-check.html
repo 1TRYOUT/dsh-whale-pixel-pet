@@ -1,0 +1,135 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<title>桌宠布局安全性回归测试（故意不加载样式表）</title>
+<style>
+  /* 只给测试台自己一点样式，故意【不】引入 whale-pet.css */
+  html, body { margin: 0; }
+  body { font: 12.5px/1.5 Consolas, "Microsoft YaHei", monospace; color: #123; }
+  #host { width: 420px; height: 60px; padding: 8px; background: #eef3f8; }
+  #result { white-space: pre; padding: 8px; }
+  .ok { color: #12794a; }
+  .bad { color: #c02a2a; }
+  .dim { color: #667; }
+</style>
+</head>
+<body>
+<div id="host">宿主内容（模拟 DSH 的业务界面）</div>
+<pre id="result">running…</pre>
+
+<script src="../assets/whale-pet.js"></script>
+<script src="../assets/whale-pet-overlay.js"></script>
+<script>
+(function () {
+  var out = [], pass = 0, fail = 0;
+  function emit(t, c) { out.push({ t: t, c: c || 'dim' }); }
+  function check(name, cond, extra) {
+    if (cond) { pass++; emit('PASS  ' + name, 'ok'); }
+    else { fail++; emit('FAIL  ' + name + (extra !== undefined ? '  → ' + extra : ''), 'bad'); }
+  }
+  function flush() {
+    document.getElementById('result').innerHTML = out.map(function (l) {
+      return '<span class="' + l.c + '">' + l.t.replace(/[<>&]/g, function (c) {
+        return { '<': '&lt;', '>': '&gt;', '&': '&amp;' }[c];
+      }) + '</span>';
+    }).join('\n') + '\n\n' + (fail === 0 ? 'ALL PASS (' + pass + ')' : 'FAILED ' + fail + ' / ' + (pass + fail));
+    console.log('[no-css] RESULT: ' + (fail === 0 ? ('ALL PASS (' + pass + ')') : ('FAILED ' + fail + ' / ' + (pass + fail))));
+    out.forEach(function (l) { if (l.c === 'bad') console.log('[no-css] ' + l.t); });
+  }
+
+  var de = document.documentElement;
+  var vpW = innerWidth, vpH = innerHeight;
+  // body 的实际高度是"我的层有没有把宿主内容顶下去"的直接判据
+  // （documentElement.scrollHeight 有视口高度下限，会掩盖小幅增长）
+  function bodyH() { return Math.round(document.body.getBoundingClientRect().height); }
+  function overH() { return Math.max(0, de.scrollHeight - vpH); }
+  function overW() { return Math.max(0, de.scrollWidth - vpW); }
+  var baseBody = bodyH(), baseOverH = overH(), baseOverW = overW();
+  emit('# 挂载前：视口 ' + vpW + 'x' + vpH + '，body 高 ' + baseBody + '，溢出 ' + baseOverW + 'x' + baseOverH);
+
+  // 确认页面里真的没有加载桌宠样式表
+  var hasPetCss = false;
+  for (var i = 0; i < document.styleSheets.length; i++) {
+    var href = document.styleSheets[i].href || '';
+    if (href.indexOf('whale-pet.css') >= 0) hasPetCss = true;
+  }
+  check('本页确实没有引入 whale-pet.css', hasPetCss === false);
+
+  // 故意用像素画风，避免加载立绘影响测量
+  var overlay = window.WhalePetOverlay.createOverlay({
+    storageKey: 'whale-pet:nocss',
+    config: { art: 'pixel', sound: false, bubble: false, guiPet: true },
+    win: window, doc: document
+  });
+  overlay.load = function () { return this; };
+  overlay.save = function () { return {}; };
+  overlay.mount();
+  overlay.pet.say('布局安检中', 30);
+  overlay.pet.update(0.016);
+  overlay.pet.render(overlay.ctx);
+  overlay.togglePanel(true);          // 面板/菜单/气泡都打开，压力最大
+
+  var diag = overlay.diagnose();
+  emit('# 诊断：' + JSON.stringify(diag));
+  check('根节点被固定定位（不占文档流）', diag.rootPosition === 'fixed', diag.rootPosition);
+  check('画布是绝对定位（不在流里）', diag.canvasPosition === 'absolute', diag.canvasPosition);
+  check('布局自检通过', diag.layoutOk === true, JSON.stringify(diag));
+
+  var nowBody = bodyH(), nowOverH = overH(), nowOverW = overW();
+  emit('# 挂载后：body 高 ' + nowBody + '，溢出 ' + nowOverW + 'x' + nowOverH);
+  check('挂载桌宠没有把宿主内容顶下去（不会出现底部白边）', nowBody <= baseBody + 2, baseBody + ' → ' + nowBody);
+  check('挂载后没有引入纵向溢出（不会能往下滑）', nowOverH <= baseOverH + 2, baseOverH + ' → ' + nowOverH);
+  check('挂载后没有引入横向溢出（不会出现横向滚动条）', nowOverW <= baseOverW + 2, baseOverW + ' → ' + nowOverW);
+  check('宿主内容自身高度未被改变', Math.abs(document.getElementById('host').offsetHeight - 76) <= 2,
+    String(document.getElementById('host').offsetHeight));
+  check('气泡存在时 body 高度依旧不变', bodyH() <= baseBody + 2, String(bodyH()));
+
+  /* ---- 对照组：证明"不加固"就是这次故障的成因 ---- */
+  var naive = document.createElement('div');
+  var ncv = document.createElement('canvas');
+  ncv.width = 400; ncv.height = 400;
+  ncv.style.display = 'block';
+  ncv.style.width = '400px';
+  ncv.style.height = '400px';
+  naive.appendChild(ncv);
+  document.body.appendChild(naive);
+  var grownBody = bodyH();
+  emit('# 对照（未加固的 400px 高画布）：body 高 ' + grownBody);
+  check('对照组：未加固的画布会把宿主内容顶下去 400px = 底部大白边 + 能下滑',
+    grownBody >= baseBody + 390, baseBody + ' → ' + grownBody);
+  naive.remove();
+  check('移除对照组后 body 高度复原', bodyH() <= baseBody + 2, String(bodyH()));
+
+  /* ---- GUI 渲染开关：默认只留桌面版，GUI 里不画她也不吞点击 ---- */
+  emit('');
+  emit('=== GUI 渲染开关（guiPet）===');
+  check('默认开着 GUI 渲染（本页显式开启）', overlay.guiVisible() === true);
+  check('GUI 渲染时画布可见', overlay.canvas.style.display === 'block', overlay.canvas.style.display);
+
+  overlay.cfg.guiPet = false;
+  overlay.applyCfg();
+  check('关掉 GUI 渲染后 guiVisible 为假', overlay.guiVisible() === false);
+  check('关掉后画布不再显示（她不在窗口里）', overlay.canvas.style.display === 'none', overlay.canvas.style.display);
+  check('关掉后面板也打不开', overlay.togglePanel(true) === false);
+  check('关掉后依然不会撑开宿主', bodyH() <= baseBody + 2, baseBody + ' → ' + bodyH());
+
+  // 关掉渲染后仍要继续上报状态（桌面版靠它活着）——这里只验证采集链路没被切断
+  overlay.signal('working');
+  overlay.pet.update(1 / 60);
+  check('关掉渲染后状态机照常运转（ambient 已更新）', overlay.pet.ambient === 'working', overlay.pet.ambient);
+
+  overlay.cfg.guiPet = true;
+  overlay.applyCfg();
+  check('重新打开后她又回到窗口里', overlay.guiVisible() === true && overlay.canvas.style.display === 'block');
+
+  // 卸载后不留痕
+  overlay.destroy();
+  check('销毁后节点被清理干净', document.querySelectorAll('[data-dsh-whale-pet-root]').length === 0);
+  check('销毁后 body 高度复原', bodyH() <= baseBody + 2, String(bodyH()));
+
+  flush();
+})();
+</script>
+</body>
+</html>

@@ -1,0 +1,279 @@
+/*!
+ * 鲸鱼娘像素桌宠 · 样式
+ * 所有选择器都带 .dwp- 前缀，只作用于插件自己创建的节点。
+ * 主题跟随：优先用宿主 body[data-ds-dark-theme]，其次 prefers-color-scheme。
+ */
+
+.dwp-root {
+  position: fixed;
+  inset: 0;
+  z-index: 2147482000;
+  pointer-events: none;          /* 整层不挡业务 UI */
+  font-family: "Segoe UI", "Microsoft YaHei", -apple-system, sans-serif;
+  --dwp-bg: rgba(255, 255, 255, 0.92);
+  --dwp-fg: #16324a;
+  --dwp-sub: #5b7891;
+  --dwp-line: rgba(22, 50, 74, 0.14);
+  --dwp-accent: #3f8fd0;
+  --dwp-track: rgba(22, 50, 74, 0.10);
+  --dwp-shadow: 0 10px 30px rgba(16, 40, 60, 0.18);
+}
+
+body[data-ds-dark-theme] .dwp-root,
+body[data-ds-dark-theme=""] .dwp-root {
+  --dwp-bg: rgba(22, 32, 44, 0.94);
+  --dwp-fg: #dce9f7;
+  --dwp-sub: #8fa9c2;
+  --dwp-line: rgba(160, 200, 240, 0.16);
+  --dwp-accent: #7fd4ff;
+  --dwp-track: rgba(160, 200, 240, 0.14);
+  --dwp-shadow: 0 12px 34px rgba(0, 0, 0, 0.45);
+}
+
+@media (prefers-color-scheme: dark) {
+  .dwp-root {
+    --dwp-bg: rgba(22, 32, 44, 0.94);
+    --dwp-fg: #dce9f7;
+    --dwp-sub: #8fa9c2;
+    --dwp-line: rgba(160, 200, 240, 0.16);
+    --dwp-accent: #7fd4ff;
+    --dwp-track: rgba(160, 200, 240, 0.14);
+    --dwp-shadow: 0 12px 34px rgba(0, 0, 0, 0.45);
+  }
+}
+
+.dwp-canvas {
+  display: block;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;          /* 命中测试自己做，绝不吞事件 */
+}
+
+/* ------------------------------ 气泡 ------------------------------ */
+
+.dwp-bubble {
+  position: absolute;
+  transform: translate(-50%, -100%);
+  max-width: 220px;
+  padding: 6px 10px;
+  background: var(--dwp-bg);
+  color: var(--dwp-fg);
+  border: 1px solid var(--dwp-line);
+  border-radius: 12px;
+  box-shadow: var(--dwp-shadow);
+  font-size: 12.5px;
+  line-height: 1.45;
+  pointer-events: none;
+  white-space: pre-wrap;
+  backdrop-filter: blur(6px);
+  transition: opacity 0.15s ease;
+}
+.dwp-bubble::after {
+  content: "";
+  position: absolute;
+  left: 50%;
+  bottom: -6px;
+  width: 10px;
+  height: 10px;
+  margin-left: -5px;
+  background: var(--dwp-bg);
+  border-right: 1px solid var(--dwp-line);
+  border-bottom: 1px solid var(--dwp-line);
+  transform: rotate(45deg);
+}
+.dwp-bubble-left { transform: translate(-20%, -100%); }
+.dwp-bubble-left::after { left: 22%; }
+
+/* --------------------------- 唤回按钮 --------------------------- */
+
+.dwp-recall {
+  position: fixed;
+  left: 14px;
+  bottom: 14px;
+  width: 38px;
+  height: 38px;
+  display: none;                 /* 隐藏桌宠时才出现 */
+  align-items: center;
+  justify-content: center;
+  font-size: 20px;
+  border-radius: 50%;
+  border: 1px solid var(--dwp-line);
+  background: var(--dwp-bg);
+  color: var(--dwp-fg);
+  box-shadow: var(--dwp-shadow);
+  cursor: pointer;
+  pointer-events: auto;
+  opacity: 0.65;
+  transition: opacity 0.15s ease, transform 0.15s ease;
+}
+.dwp-recall:hover { opacity: 1; transform: scale(1.06); }
+
+/* ---------------------------- 右键菜单 ---------------------------- */
+
+.dwp-menu {
+  position: fixed;
+  min-width: 172px;
+  padding: 6px;
+  background: var(--dwp-bg);
+  border: 1px solid var(--dwp-line);
+  border-radius: 12px;
+  box-shadow: var(--dwp-shadow);
+  backdrop-filter: blur(10px);
+  pointer-events: auto;
+}
+.dwp-menu-item {
+  display: block;
+  width: 100%;
+  padding: 7px 10px;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--dwp-fg);
+  font-size: 12.5px;
+  text-align: left;
+  cursor: pointer;
+}
+.dwp-menu-item:hover { background: var(--dwp-track); }
+.dwp-menu-sep { height: 1px; margin: 5px 6px; background: var(--dwp-line); }
+
+/* ------------------------------ 面板 ------------------------------ */
+
+.dwp-panel {
+  position: fixed;
+  right: 16px;
+  bottom: 232px;
+  width: 272px;
+  max-height: min(64vh, 560px);
+  overflow: auto;
+  padding: 12px;
+  background: var(--dwp-bg);
+  border: 1px solid var(--dwp-line);
+  border-radius: 16px;
+  box-shadow: var(--dwp-shadow);
+  backdrop-filter: blur(12px);
+  color: var(--dwp-fg);
+  pointer-events: auto;
+  font-size: 12px;
+}
+.dwp-panel-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 8px;
+}
+.dwp-panel-title { font-weight: 600; font-size: 13px; }
+.dwp-x {
+  width: 22px; height: 22px;
+  border: 0; border-radius: 6px;
+  background: transparent; color: var(--dwp-sub);
+  font-size: 16px; line-height: 1; cursor: pointer;
+}
+.dwp-x:hover { background: var(--dwp-track); color: var(--dwp-fg); }
+
+.dwp-row { display: flex; align-items: center; gap: 8px; margin-bottom: 10px; }
+.dwp-name {
+  flex: 1;
+  min-width: 0;
+  padding: 5px 8px;
+  border: 1px solid var(--dwp-line);
+  border-radius: 8px;
+  background: transparent;
+  color: var(--dwp-fg);
+  font-size: 12.5px;
+  outline: none;
+}
+.dwp-name:focus { border-color: var(--dwp-accent); }
+.dwp-lv {
+  flex: none;
+  padding: 3px 8px;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--dwp-accent) 18%, transparent);
+  color: var(--dwp-accent);
+  font-weight: 600;
+  font-size: 11.5px;
+}
+
+.dwp-bars { display: grid; gap: 6px; margin-bottom: 8px; }
+.dwp-bar-row { display: grid; grid-template-columns: 34px 1fr 26px; align-items: center; gap: 6px; }
+.dwp-bar-label { color: var(--dwp-sub); font-size: 11.5px; }
+.dwp-bar-track {
+  position: relative;
+  display: block;
+  height: 7px;
+  border-radius: 999px;
+  background: var(--dwp-track);
+  overflow: hidden;
+}
+.dwp-bar-fill {
+  position: absolute;
+  inset: 0 auto 0 0;
+  display: block;
+  width: 0;
+  border-radius: 999px;
+  transition: width 0.35s ease;
+}
+.dwp-mood { background: linear-gradient(90deg, #ff9ec4, #ff7aa2); }
+.dwp-hunger { background: linear-gradient(90deg, #ffd27f, #f5a742); }
+.dwp-energy { background: linear-gradient(90deg, #9fe6ff, #58b8e8); }
+.dwp-bar-val { text-align: right; color: var(--dwp-sub); font-variant-numeric: tabular-nums; font-size: 11px; }
+
+.dwp-exp-row { display: grid; grid-template-columns: 1fr auto; align-items: center; gap: 8px; margin-bottom: 10px; }
+.dwp-exp-track { position: relative; display: block; height: 5px; border-radius: 999px; background: var(--dwp-track); overflow: hidden; }
+.dwp-exp-fill { position: absolute; inset: 0 auto 0 0; width: 0; background: linear-gradient(90deg, #7fd4ff, #4a86c4); transition: width 0.35s ease; }
+.dwp-exp-text { color: var(--dwp-sub); font-size: 10.5px; white-space: nowrap; }
+
+.dwp-actions { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; margin-bottom: 8px; }
+.dwp-btn {
+  padding: 7px 8px;
+  border: 1px solid var(--dwp-line);
+  border-radius: 9px;
+  background: transparent;
+  color: var(--dwp-fg);
+  font-size: 12px;
+  cursor: pointer;
+  transition: background 0.15s ease, transform 0.1s ease;
+}
+.dwp-btn:hover { background: var(--dwp-track); }
+.dwp-btn:active { transform: scale(0.97); }
+
+.dwp-toggles { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 8px; }
+.dwp-chip {
+  padding: 5px 9px;
+  border: 1px solid var(--dwp-line);
+  border-radius: 999px;
+  background: transparent;
+  color: var(--dwp-sub);
+  font-size: 11.5px;
+  cursor: pointer;
+}
+.dwp-chip.on {
+  background: color-mix(in srgb, var(--dwp-accent) 20%, transparent);
+  border-color: color-mix(in srgb, var(--dwp-accent) 45%, transparent);
+  color: var(--dwp-accent);
+}
+
+.dwp-skins { display: flex; gap: 6px; margin-bottom: 8px; }
+.dwp-skin {
+  flex: 1;
+  padding: 5px 4px;
+  border: 1px solid var(--dwp-line);
+  border-radius: 9px;
+  background: transparent;
+  color: var(--dwp-sub);
+  font-size: 11px;
+  cursor: pointer;
+  position: relative;
+}
+.dwp-skin::before {
+  content: "";
+  display: block;
+  width: 12px; height: 12px;
+  margin: 0 auto 3px;
+  border-radius: 50%;
+  background: var(--dwp-swatch, #4a86c4);
+  border: 1px solid var(--dwp-line);
+}
+.dwp-skin.on { color: var(--dwp-fg); border-color: color-mix(in srgb, var(--dwp-accent) 55%, transparent); }
+
+.dwp-stats { color: var(--dwp-sub); font-size: 11px; line-height: 1.6; }
+.dwp-foot { margin-top: 8px; padding-top: 8px; border-top: 1px solid var(--dwp-line); color: var(--dwp-sub); font-size: 10.5px; }

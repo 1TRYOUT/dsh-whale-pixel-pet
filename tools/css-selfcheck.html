@@ -1,0 +1,21 @@
+<!doctype html><meta charset="utf-8">
+<link rel="stylesheet" href="../assets/whale-pet.css">
+<body style="margin:0">
+<script>
+window.addEventListener('load', function () {
+  var out = [];
+  var ss = document.styleSheets[0];
+  var n = -1; try { n = ss.cssRules.length; } catch (e) { n = 'ERR:' + e.name; }
+  out.push('rules=' + n);
+  var d = document.createElement('div');
+  d.className = 'dwp-root';
+  document.body.appendChild(d);
+  var cs = getComputedStyle(d);
+  out.push('computed position=' + cs.position + ' top=' + cs.top + ' pointer-events=' + cs.pointerEvents + ' z-index=' + cs.zIndex);
+  // 关键规则是否命中：canvas 是否 100%
+  var c = document.createElement('canvas'); c.className = 'dwp-canvas'; d.appendChild(c);
+  out.push('canvas display=' + getComputedStyle(c).display + ' width=' + getComputedStyle(c).width);
+  document.title = 'CSSTEST ' + out.join(' | ');
+  console.log('[csstest] ' + out.join(' | '));
+});
+</script>

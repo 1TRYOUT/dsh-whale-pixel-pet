@@ -1,0 +1,17 @@
+# ---- 本地隐私：从真实桌面截的图，绝不公开 ----
+shots/
+
+# ---- 私有研究资料：三个参考项目的源码副本，公开等于转发别人的代码 ----
+research/
+
+# ---- 运行期产物 ----
+.pet.pid
+desktop/.pet.pid
+*.log
+.tmp-*
+
+# ---- 依赖与系统 ----
+node_modules/
+Thumbs.db
+desktop.ini
+.DS_Store
