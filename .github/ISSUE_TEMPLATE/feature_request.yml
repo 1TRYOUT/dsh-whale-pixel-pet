@@ -1,0 +1,39 @@
+name: Feature request
+description: Suggest a new interaction, a new art style, or a different host form
+title: "[feat] "
+labels: ["enhancement"]
+body:
+  - type: dropdown
+    id: kind
+    attributes:
+      label: What kind of addition?
+      options:
+        - New interaction (action, food, behaviour)
+        - New look (art style, palette, sprite)
+        - Session linkage (react to more DSH state)
+        - Desktop form (window behaviour, tray, hotkeys)
+        - Developer-facing (docs, plugin API)
+    validations:
+      required: true
+  - type: textarea
+    id: idea
+    attributes:
+      label: What should she do?
+      description: Describe the behaviour as the user would experience it.
+    validations:
+      required: true
+  - type: textarea
+    id: why
+    attributes:
+      label: Why is it worth it?
+      description: Optional, but it helps to know whether you want charm, usefulness, or both.
+    validations:
+      required: false
+  - type: checkboxes
+    id: constraints
+    attributes:
+      label: Design constraints this project cares about
+      options:
+        - label: It can be done without reading chat message content
+        - label: It can be done without modifying DSH built-in files
+        - label: It keeps the click-through / zero-intrusion behaviour intact

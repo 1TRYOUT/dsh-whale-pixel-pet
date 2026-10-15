@@ -1,5 +1,7 @@
 # 🐋 鲸鱼娘 · DeepSeek Harness 桌宠
 
+**English** → [README.en.md](README.en.md)　|　插件开发指南 → [docs/PLUGIN-GUIDE.md](docs/PLUGIN-GUIDE.md)
+
 一只常驻 DSH 界面的鲸鱼娘。她**知道你在干什么**：模型在跑就歪头思考，工具在动就抱起笔记本，
 卡在待审批就举着沙漏等你，出错就蔫下来；你摸头、投喂、夸夸她，她按 Token 用量慢慢长大。
 
