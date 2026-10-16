@@ -22,6 +22,8 @@ contextBridge.exposeInMainWorld('petBridge', {
     ipcRenderer.on('pet:walk-end', handler);
     return () => ipcRenderer.removeListener('pet:walk-end', handler);
   },
+  /** 请宿主批准当前待审批项（只允许一次；真正点击由 DSH 页面里的客户端半边执行） */
+  approve: () => ipcRenderer.send('pet:approve'),
   hide: () => ipcRenderer.send('pet:hide'),
   quit: () => ipcRenderer.send('pet:quit'),
   resetPos: () => ipcRenderer.send('pet:reset-pos'),

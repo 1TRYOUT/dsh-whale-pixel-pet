@@ -185,6 +185,8 @@ function fetchState() {
       progress: d.progress || null,
       usage: d.usage || null,
       hostRunning: !!d.hostRunning,
+      command: d.command || null,
+      commandResult: d.commandResult || null,
     };
   } catch (e) {
     return null;              // DSH 没开 / 插件没装 / 还没写过：静默，她自己待机
@@ -302,6 +304,20 @@ ipcMain.on('pet:drag', (_e, d) => {
 });
 
 ipcMain.on('pet:drag-end', () => { savePos(); });
+
+/** 反向通道：桌面 -> 宿主（宿主轮询这个文件），因为桌面进程拿不到 /api 鉴权 */
+const COMMAND_FILE = path.join(path.dirname(STATE_FILE), 'command.json');
+
+/** 请求批准当前待审批项（只允许一次；由 DSH 页面里的客户端半边真正执行） */
+ipcMain.on('pet:approve', () => {
+  try {
+    fs.mkdirSync(path.dirname(COMMAND_FILE), { recursive: true });
+    fs.writeFileSync(COMMAND_FILE, JSON.stringify({ action: 'approve', nonce: Date.now() }), 'utf8');
+    debugLog('已写入审批命令 ' + COMMAND_FILE);
+  } catch (e) {
+    debugLog('写审批命令失败: ' + (e && e.message));
+  }
+});
 
 ipcMain.on('pet:hide', () => { if (win) { win.hide(); refreshTray(); } });
 ipcMain.on('pet:quit', () => { quitting = true; app.quit(); });

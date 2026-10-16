@@ -261,6 +261,12 @@
       case 'reset': resetGrowth(); break;
       case 'sound': prefs.sound = !prefs.sound; audio.enabled = prefs.sound; savePrefs(); refreshPanel(); break;
       case 'bubble': prefs.bubble = !prefs.bubble; savePrefs(); refreshPanel(); break;
+      case 'approve':
+        if (bridge.approve) {
+          bridge.approve();
+          pet.say('好，我去点同意～', 2.4);
+        }
+        break;
       case 'hud':
         prefs.hud = prefs.hud === false;
         savePrefs(); refreshPanel();
@@ -292,6 +298,9 @@
     const sleeping = pet.mode === 'sleep';
     return {
       items: [
+        ...((window.__lastState || {}).state === 'approval'
+          ? [{ id: 'approve', label: '✅ 允许这次运行（等价于在 DSH 里按 Enter）' }, { type: 'separator' }]
+          : []),
         { id: 'pat', label: '摸摸头' },
         { id: 'praise', label: '夸夸她' },
         { id: 'play', label: '玩一下' },
@@ -426,6 +435,14 @@
     barFill.style.width = Math.max(0, Math.min(100, (s.exp / Math.max(1, s.expNeed)) * 100)) + '%';
 
     panel.actions.textContent = '';
+    // 待审批时，面板顶部给一个「允许」——点了就等价于你在 DSH 里按 Enter（允许一次）
+    const st0 = window.__lastState || {};
+    if (st0.state === 'approval' && bridge.approve) {
+      const allow = button('✅ 允许这次运行', () => { bridge.approve(); pet.say('好，我去点同意～', 2.4); });
+      allow.style.background = 'rgba(80,200,140,0.30)';
+      allow.style.borderColor = 'rgba(120,240,180,0.55)';
+      panel.actions.appendChild(allow);
+    }
     (A ? A.ACTIONS : []).forEach((act) => {
       const label = act.id === 'sleep' ? (s.sleeping ? '叫醒她' : '睡吧') : act.label;
       panel.actions.appendChild(button(label, () => runAction(act.id)));
@@ -550,6 +567,7 @@
   /* ------------------------------ DSH 状态联动 ------------------------------ */
 
   let lastTokens = 0;
+  let lastCommandAt = 0;
   let lastStateKey = '';
 
   function applyState(s) {
@@ -568,6 +586,12 @@
     const labels = { idle: '', thinking: 'DSH 正在思考', working: 'DSH 正在干活', approval: 'DSH 等你确认', error: 'DSH 出错了' };
     hintEl.textContent = s.stale ? '' : (labels[s.state] || '');
     document.body.dataset.state = s.state;
+    // 回报"帮你点了审批"的结果
+    if (s.commandResult && s.commandResult.at !== lastCommandAt) {
+      lastCommandAt = s.commandResult.at;
+      if (s.commandResult.ok) pet.say("同意啦～", 2.4);
+      else pet.say("点不动…你自己来吧（" + (s.commandResult.error || "未知原因") + "）", 3.2);
+    }
     renderHud(s);
   }
 

@@ -452,3 +452,48 @@ test('桌面版控制：没在运行时 stop 是幂等的', async () => {
   assert.equal(res.code, 200);
   assert.equal(JSON.parse(res.text()).already, true);
 });
+/* ============================ 审批命令通道 ============================ */
+
+test('审批通道：桌面写命令文件 → 宿主消费 → GET 能看到 → 回报后清空', async () => {
+  const { ctx, routes, effects } = makeCtx();
+  await mod.apply(ctx);
+  const state = routes.find((r) => r.path.endsWith('/state'));
+  const cmdFile = path.join(TMP, 'command.json');
+
+  // 桌面端把命令写到文件里（桌面进程拿不到 /api 鉴权，所以反向也走文件）
+  writeFileSync(cmdFile, JSON.stringify({ action: 'approve', nonce: 4242 }), 'utf8');
+
+  // 宿主每 800ms 轮询一次
+  await new Promise((r) => setTimeout(r, 1200));
+
+  const got = JSON.parse((await call(state.handler, { url: '/api/dsh-whale-pixel-pet/state' })).text());
+  assert.ok(got.command, 'GET 应当能看到待执行命令');
+  assert.equal(got.command.action, 'approve');
+  assert.equal(got.command.nonce, 4242);
+  assert.ok(!existsSync(cmdFile), '命令文件应当已被消费掉');
+
+  // 页面回报结果
+  await call(state.handler, { method: 'POST', url: '/api/dsh-whale-pixel-pet/state', body: { commandResult: { nonce: 4242, ok: true } } });
+  const after = JSON.parse((await call(state.handler, { url: '/api/dsh-whale-pixel-pet/state' })).text());
+  assert.equal(after.command, null, '收到回执后应当清空待执行命令');
+  assert.equal(after.commandResult.ok, true);
+  disposeAll(effects);
+});
+
+test('审批通道：非 approve 的命令与坏 JSON 都不会被当成命令', async () => {
+  const { ctx, routes, effects } = makeCtx();
+  await mod.apply(ctx);
+  const state = routes.find((r) => r.path.endsWith('/state'));
+  const cmdFile = path.join(TMP, 'command.json');
+
+  writeFileSync(cmdFile, JSON.stringify({ action: 'reboot-everything' }), 'utf8');
+  await new Promise((r) => setTimeout(r, 1200));
+  assert.equal(JSON.parse((await call(state.handler, { url: '/api/dsh-whale-pixel-pet/state' })).text()).command, null, '不认识的动作不能被执行');
+
+  writeFileSync(cmdFile, '{坏掉的 json', 'utf8');
+  await new Promise((r) => setTimeout(r, 1200));
+  const after = JSON.parse((await call(state.handler, { url: '/api/dsh-whale-pixel-pet/state' })).text());
+  assert.equal(after.command, null, '坏 JSON 也不能崩');
+  assert.ok(!existsSync(cmdFile), '坏文件也要被消费掉，否则会一直卡着');
+  disposeAll(effects);
+});
