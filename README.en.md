@@ -140,6 +140,11 @@ experiments** proving the assertions can actually fail.
 The dual-face (host + client) package shape, the lazy-CJS client bundle, the zero-intrusion rules and
 the testing approach are written up in [docs/PLUGIN-GUIDE.md](docs/PLUGIN-GUIDE.md).
 
+## Roadmap
+
+What could come next (with a survey of comparable open-source projects and reasonings for what *not* to
+do) is in [docs/ROADMAP.md](docs/ROADMAP.md).
+
 ## License
 
 Code: MIT — see [LICENSE](LICENSE).
