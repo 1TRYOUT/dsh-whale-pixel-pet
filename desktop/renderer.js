@@ -266,6 +266,11 @@
         savePrefs(); refreshPanel();
         renderHud(window.__lastState || {});
         break;
+      case 'speak':
+        prefs.speak = prefs.speak !== true;
+        if (!prefs.speak && window.speechSynthesis) { try { window.speechSynthesis.cancel(); } catch (e) { /* ignore */ } }
+        savePrefs(); refreshPanel();
+        break;
       case 'quit': if (bridge.quit) bridge.quit(); break;
       default:
         if (id && id.indexOf('skin-') === 0 && A) {
