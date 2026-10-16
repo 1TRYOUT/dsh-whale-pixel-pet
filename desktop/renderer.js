@@ -88,6 +88,7 @@
     ctx.clearRect(0, 0, window.innerWidth, window.innerHeight);
     pet.render(ctx);
     renderBubble();
+    speakIfNeeded();
     renderDebug(dt);
     requestAnimationFrame(frame);
   }
@@ -438,6 +439,7 @@
     panel.toggleRow.appendChild(button((prefs.sound ? '🔊 音效开' : '🔇 音效关'), () => runAction('sound')));
     panel.toggleRow.appendChild(button((prefs.bubble ? '💬 气泡开' : '💬 气泡关'), () => runAction('bubble')));
     panel.toggleRow.appendChild(button((prefs.hud !== false ? '📋 信息栏开' : '📋 信息栏关'), () => runAction('hud')));
+    panel.toggleRow.appendChild(button((prefs.speak === true ? '🗣 朗读开' : '🗣 朗读关'), () => runAction('speak')));
 
     panel.adminRow.textContent = '';
     panel.adminRow.appendChild(button('回右下角', () => runAction('home')));
@@ -496,6 +498,50 @@
       ' | ' + (st.state || '-') + (st.stale ? '(stale)' : '') + ' | ' + (pet.pose || '-');
   }
 
+  /* ------------------------------ 场合立绘 + 朗读 ------------------------------ */
+
+  const sessionStart = Date.now();
+  let lastOccTag = '';
+  let lastOccAt = 0;
+  let lastSpoken = '';
+
+  const occ = (window.WhalePetOccasions && window.WhalePetOccasions.pick) ? window.WhalePetOccasions : null;
+
+  /** 节日 / 深夜 / 清早 / 连续工作太久 —— 换一张应景立绘并说一句 */
+  function tickOccasions(now) {
+    if (!occ) return;
+    const o = occ.pick(new Date(), { workedMinutes: Math.round((Date.now() - sessionStart) / 60000) });
+    if (!o) return;
+    const cool = occ.cooldownMs ? occ.cooldownMs(o.kind) : 3600000;
+    if (o.tag === lastOccTag && now - lastOccAt < cool) return;
+    lastOccTag = o.tag;
+    lastOccAt = now;
+    if (pet.hintArt) pet.hintArt(o.hint, 8);
+    if (o.line) pet.say(o.line, 4.5);
+  }
+  tickOccasions(Date.now());
+  setInterval(() => tickOccasions(Date.now()), 60000);
+
+  /**
+   * 朗读：Chromium 自带 speechSynthesis（走系统语音，零依赖零联网）。
+   * 默认关闭，面板里打开；同一句话不重复念。
+   */
+  function speakIfNeeded() {
+    if (prefs.speak !== true) return;
+    const synth = window.speechSynthesis;
+    if (!synth || !pet.speech) return;
+    const text = String(pet.speech.text || '');
+    if (!text || text === lastSpoken) return;
+    lastSpoken = text;
+    try {
+      const u = new SpeechSynthesisUtterance(text);
+      u.lang = 'zh-CN';
+      u.rate = 1.05;
+      u.pitch = 1.3;
+      synth.cancel();
+      synth.speak(u);
+    } catch (e) { /* 系统没装语音包就安静跳过 */ }
+  }
   /* ------------------------------ DSH 状态联动 ------------------------------ */
 
   let lastTokens = 0;

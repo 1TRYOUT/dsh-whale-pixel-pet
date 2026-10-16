@@ -71,7 +71,17 @@
     foodCake: 'dsh-whale-state-celebrate.webp',
     foodDrink: 'dsh-whale-state-daily-coffee.webp',
     foodSalad: 'dsh-whale-state-daily-cooking.webp',
-    gameWin: 'dsh-whale-state-game-win.webp'
+    gameWin: 'dsh-whale-state-game-win.webp',
+    // 场合立绘（assets/pet-occasions.js 判定后由宿主 hintArt 触发）
+    festivalNewYear: 'dsh-whale-state-celebrate.webp',
+    festivalSpring: 'dsh-whale-state-festival-spring.webp',
+    festivalMidAutumn: 'dsh-whale-state-festival-mid-autumn.webp',
+    festivalHalloween: 'dsh-whale-state-festival-halloween.webp',
+    festivalChristmas: 'dsh-whale-state-festival-christmas.webp',
+    valentine: 'dsh-whale-state-valentine.webp',
+    pajama: 'dsh-whale-state-daily-pajama.webp',
+    dailyCoffee: 'dsh-whale-state-daily-coffee.webp',
+    dailyStretch: 'dsh-whale-state-daily-stretch.webp'
   };
 
   /* 常用姿势先加载，其余空闲时段再慢慢取（避免开屏卡顿） */
