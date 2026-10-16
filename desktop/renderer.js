@@ -552,7 +552,18 @@
     const raw = localStorage.getItem(KEY);
     if (raw) {
       const saved = JSON.parse(raw);
-      if (saved && saved.pet) pet.load(saved.pet);
+      if (saved && saved.pet) {
+        pet.load(saved.pet);
+        // ⚠️ 桌面版的"位置"是**窗口位置**，画布内的 x/y 没有意义。
+        // 存档里带着窗口版用的画布坐标，load() 会把上面刚设好的居中坐标覆盖掉，
+        // 结果她贴到窗口边上——用户按"她该在的位置"点击自然点不到（这就是
+        // "桌宠没有鼠标交互"的真凶）。所以读完存档必须重新居中。
+        pet.x = window.innerWidth / 2;
+        pet.y = pet.floorY();
+        pet.vx = 0;
+        pet.vy = 0;
+        pet.walkTarget = null;
+      }
       if (saved && typeof saved.tokens === 'number') lastTokens = saved.tokens;
     }
   } catch (e) { /* file:// 下拿不到存储也不影响 */ }
