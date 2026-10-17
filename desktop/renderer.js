@@ -586,6 +586,9 @@
     const labels = { idle: '', thinking: 'DSH 正在思考', working: 'DSH 正在干活', approval: 'DSH 等你确认', error: 'DSH 出错了' };
     hintEl.textContent = s.stale ? '' : (labels[s.state] || '');
     document.body.dataset.state = s.state;
+    // 面板开着时，状态变了要跟着刷新——否则待审批到达那一刻"允许"按钮不会出现。
+    //（openPanel() 里也有一句同样的刷新，但那只在你打开面板那一瞬间生效。）
+    if (panelOpen) refreshPanel();
     // 回报"帮你点了审批"的结果
     if (s.commandResult && s.commandResult.at !== lastCommandAt) {
       lastCommandAt = s.commandResult.at;
