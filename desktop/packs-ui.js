@@ -92,6 +92,11 @@
     'border:1px solid rgba(150,200,255,0.30)', 'border-radius:8px',
     'cursor:pointer', 'pointer-events:auto', 'z-index:5',
   ].join(';');
+  // ⚠️ 这个按钮落在她的命中框里，renderer 的 pointerdown 会把它当成"摸头"吞掉。
+  // 所以在按钮上拦住指针事件，别让它们冒泡到 window。
+  ['pointerdown', 'pointerup', 'mousedown', 'mouseup'].forEach((type) => {
+    btn.addEventListener(type, (e) => { e.stopPropagation(); });
+  });
   btn.addEventListener('click', (e) => {
     e.preventDefault();
     e.stopPropagation();
