@@ -7,8 +7,13 @@ import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
 
 const here = dirname(fileURLToPath(import.meta.url));
-const mod = await import('../assets/pet-packs.js');
-const P = mod.default || mod;
+// pet-packs.js 是 UMD：在 Node ESM 下它把 API 挂到 globalThis，自身不 export
+await import('../assets/pet-packs.js');
+const P = globalThis.WhalePetPacks;
+if (!P || typeof P.validate !== 'function') {
+  console.log('无法加载 assets/pet-packs.js');
+  process.exit(1);
+}
 const packsDir = join(here, '..', 'assets', 'art', 'packs');
 
 if (!existsSync(packsDir)) {
