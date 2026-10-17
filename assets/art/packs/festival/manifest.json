@@ -1,0 +1,15 @@
+{
+  "name": "节庆版",
+  "author": "dsh-whale-pixel-pet",
+  "poses": {
+    "idle": "idle.webp",
+    "work": "work.webp",
+    "happy": "happy.webp",
+    "levelup": "levelup.webp"
+  },
+  "hints": {
+    "star": "star.webp",
+    "celebrate": "celebrate.webp",
+    "festivalHalloween": "halloween.webp"
+  }
+}
