@@ -393,6 +393,26 @@ ipcMain.on('pet:walk', (_e, spec) => {
     win.setPosition(Math.round(x + (remain > 0 ? 1 : -1) * step), y);
   }, stepMs);
 });
+/** 皮肤选择：存文件而不是 localStorage —— 与窗口位置同一套机制，重启后一定读得回来 */
+const PACK_FILE = path.join(path.dirname(STATE_FILE), 'pack.json');
+
+ipcMain.handle('pet:pack:get', () => {
+  try { return JSON.parse(fs.readFileSync(PACK_FILE, 'utf8')).id || ''; }
+  catch (e) { return ''; }        // 没选过 / 文件坏了 → 就当内置
+});
+
+ipcMain.handle('pet:pack:set', (_e, id) => {
+  try {
+    fs.mkdirSync(path.dirname(PACK_FILE), { recursive: true });
+    fs.writeFileSync(PACK_FILE, JSON.stringify({ id: String(id || '') }), 'utf8');
+    debugLog('皮肤选择已保存: ' + (id || '(内置)'));
+    return true;
+  } catch (e) {
+    debugLog('保存皮肤选择失败: ' + (e && e.message));
+    return false;
+  }
+});
+
 ipcMain.handle('pet:packs', () => {
   const dir = path.join(__dirname, '..', 'assets', 'art', 'packs');
   const out = [];

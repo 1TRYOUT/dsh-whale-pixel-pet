@@ -1,17 +1,18 @@
 /**
  * 立绘包选择器（独立脚本，不改主渲染器）
  * ---------------------------------------------------------------------------
- * 靠 window.__whalePetDesktop 暴露的公共句柄（art / pet）原地换肤，
- * 所以不需要动 renderer.js 的内部结构。
+ * 用 window.__whalePetDesktop 暴露的公共句柄（art）原地换肤，不动 renderer.js 内部。
  *
- * 换肤 = 改 art.base + 用 pet-packs.wrapArt 原地包一层 fileFor。
- * 为了让"换回内置"也干净（避免 wrap 叠加），切换后直接 reload 窗口：
- * 本脚本在启动时读 localStorage 里的选择并应用。
+ * 两个设计决定，都是为了"切换必须成功"：
+ *  1. **选择存主进程的文件**（pack.json），不存 localStorage ——
+ *     file:// 页面下的 localStorage 不可靠，之前"菜单选了没反应"就是它丢的。
+ *  2. **原地换肤，不重开窗口** —— 重开窗口依赖"选择已落盘"这个假设，
+ *     假设一破就表现为"切了又跳回内置"。这里先恢复原始 fileFor 再叠加，
+ *     所以换多少次都不会叠加包裹。
  *
  * 测试钩子（确定性验证，不用人去点像素）：
- *   ?pack=home   启动即应用指定皮肤      （也可用环境变量 DSH_PET_PACK）
- *   ?packs=1     启动即弹出选择器        （也可用环境变量 DSH_PET_PACKS=1）
- * 两者都会往 console 打日志；配合 electron --enable-logging=stderr 可直接断言。
+ *   DSH_PET_PACK=home   /  ?pack=home   启动即应用指定皮肤
+ *   DSH_PET_PACKS=1     /  ?packs=1     启动即弹出选择器
  */
 (function () {
   'use strict';
@@ -21,104 +22,101 @@
   const host = window.__whalePetDesktop;
   if (!P || !bridge || !host || !host.art) return;      // 环境不对就安静退出
 
-  const KEY = 'whale-pet:desktop:pack:v1';
-  const FALLBACK_FLAG = 'whale-pet:desktop:pack-fallback';
   const BUILTIN_BASE = '../assets/art/musume/';
-  let list = [];
+  const art = host.art;
+  // 记下"没有被任何包包裹过"的原始实现，换肤时先复位再包，避免层层叠加
+  const originalFileFor = art.fileFor.bind(art);
 
-  // ---- 测试钩子：URL 参数优先，其次是 preload 透传的环境变量 ----
   const params = new URLSearchParams(location.search);
   const env = (bridge.env && typeof bridge.env === 'object') ? bridge.env : {};
   const forcedPack = (params.get('pack') || env.pack || '').trim();
   const wantPicker = params.get('packs') === '1' || String(env.packs) === '1';
 
-  function log(msg) { console.log('[packs] ' + msg); }
-  function currentId() {
-    try { return localStorage.getItem(KEY) || ''; } catch (e) { return ''; }
-  }
-  function setCurrent(id) {
-    try { localStorage.setItem(KEY, id || ''); } catch (e) { /* ignore */ }
-  }
+  let list = [];
+  let current = '';
 
-  /**
-   * 把包应用到已存在的美术层上；并异步验证"包里的 idle 图到底能不能加载"。
-   * 加载失败 → 清掉选择、回落内置（只重载一次，避免死循环）。
-   */
-  function applyPack(id, pack) {
-    const art = host.art;
+  function log(msg) { console.log('[packs] ' + msg); }
+
+  /** 原地换肤：复位 fileFor → 改 base → 包一层；随后异步探针验证图片真能加载 */
+  function applyPackNow(id, pack) {
+    art.fileFor = originalFileFor;
+    if (!id || !pack) {
+      art.base = BUILTIN_BASE;
+      current = '';
+      log('已切回内置立绘');
+      return;
+    }
     art.base = '../assets/art/packs/' + id + '/';
     P.wrapArt(art, Object.assign({ base: art.base }, pack));
-    log('已应用皮肤：' + pack.name + '（id=' + id + '，共 ' + (Object.keys(pack.poses).length + Object.keys(pack.hints).length) + ' 张）');
+    current = id;
+    log('已应用皮肤：' + pack.name + '（id=' + id + '，' +
+      (Object.keys(pack.poses).length + Object.keys(pack.hints).length) + ' 张）');
 
     const probe = new Image();
     probe.onload = () => log('皮肤图片加载成功：' + probe.src.split('/').slice(-2).join('/'));
     probe.onerror = () => {
       log('皮肤图片加载失败，回落内置：' + id);
-      setCurrent('');
-      let tried = false;
-      try { tried = sessionStorage.getItem(FALLBACK_FLAG) === '1'; sessionStorage.setItem(FALLBACK_FLAG, '1'); } catch (e) { /* ignore */ }
-      if (tried) {                          // 已经回落过一次还失败 → 保持内置，别再重载
-        art.base = BUILTIN_BASE;
-        log('放弃皮肤，停在内置画风（不再重载）');
-        return;
-      }
-      try { location.reload(); } catch (e) { /* ignore */ }
+      if (bridge.setPack) bridge.setPack('');
+      applyPackNow('', null);
     };
     probe.src = art.base + (pack.poses.idle || '');
   }
 
-  /** 启动：先看强制指定，再看上次的选择 */
+  /** 把 id 解析成"能用的包"，再应用；返回是否成功 */
+  function usePack(id, source) {
+    if (!id) { applyPackNow('', null); return true; }
+    const found = list.find((p) => p.id === id);
+    if (!found) { log('找不到皮肤 ' + id + '（' + source + '），回落内置'); applyPackNow('', null); return false; }
+    const r = P.validate(found.manifest);
+    if (!r.ok) { log('皮肤无效，已忽略：' + id + ' → ' + r.errors.join('; ')); applyPackNow('', null); return false; }
+    applyPackNow(id, r.pack);
+    return true;
+  }
+
   function boot() {
-    const wanted = forcedPack || currentId();
-    if (!wanted) { log('内置画风（没有选任何皮肤）'); return; }
     bridge.packs().then((all) => {
       list = Array.isArray(all) ? all : [];
       log('发现 ' + list.length + ' 个皮肤包：' + list.map((p) => p.id).join(', '));
-      const found = list.find((p) => p.id === wanted);
-      if (!found) {
-        log('找不到皮肤 ' + wanted + '，回落内置');
-        setCurrent('');
+      if (forcedPack) {
+        // 钩子强制：应用并落盘，方便脚本验证
+        if (usePack(forcedPack, 'DSH_PET_PACK')) bridge.setPack(forcedPack);
         return;
       }
-      const r = P.validate(found.manifest);
-      if (!r.ok) {
-        log('皮肤无效，已忽略：' + wanted + ' → ' + r.errors.join('; '));
-        setCurrent('');
-        return;
-      }
-      if (forcedPack) setCurrent(forcedPack);
-      applyPack(wanted, r.pack);
+      return bridge.getPack().then((saved) => {
+        if (!saved) { log('内置画风（没有选任何皮肤）'); return; }
+        if (!usePack(saved, 'pack.json')) bridge.setPack('');
+        else log('已恢复上次的皮肤选择：' + saved);
+      });
     }).catch((e) => log('拿不到皮肤列表：' + (e && e.message)));
   }
 
   /** 打开原生菜单挑皮肤 */
   function openPicker(all) {
     list = Array.isArray(all) ? all : [];
-    const cur = forcedPack || currentId();
-    const items = [{ id: 'pack-', label: '内置立绘', type: 'checkbox', checked: !cur }];
+    const items = [{ id: 'pack-', label: '内置立绘', type: 'checkbox', checked: !current }];
     list.forEach((p) => {
       const ok = P.validate(p.manifest);
       items.push({
         id: 'pack-' + p.id,
         label: (p.manifest && p.manifest.name ? p.manifest.name : p.id) + (ok.ok ? '' : '（无效）'),
         type: 'checkbox',
-        checked: cur === p.id,
+        checked: current === p.id,
         enabled: ok.ok,
       });
     });
     if (list.length === 0) items.push({ type: 'separator' }, { id: 'pack-', label: '还没装任何皮肤包', enabled: false });
-    log('选择器已弹出：' + list.length + ' 个包（当前 ' + (cur || '内置') + '）');
+    log('选择器已弹出：' + list.length + ' 个包（当前 ' + (current || '内置') + '）');
     bridge.menu({ items: items });
   }
 
-  // 菜单回传：切换就记住选择然后重开窗口（重开能保证不叠加旧的包裹）
+  // 菜单回传：立即原地换肤 + 落盘（不重开窗口）
   bridge.onAction((id) => {
     if (!id || id.indexOf('pack-') !== 0) return;
     const next = id.slice(5);
-    if (next === currentId()) return;
+    if (next === current) { log('已经是这个皮肤了：' + (next || '内置')); return; }
     log('选择皮肤：' + (next || '内置'));
-    setCurrent(next);
-    setTimeout(() => { try { location.reload(); } catch (e) { /* ignore */ } }, 60);
+    const ok = usePack(next, '菜单');
+    bridge.setPack(ok ? next : '');
   });
 
   // 小小的 🎨 按钮：放在她命中框的右上角，这样点击能穿透开关正确落到它上面
@@ -134,7 +132,6 @@
     'cursor:pointer', 'pointer-events:auto', 'z-index:5',
   ].join(';');
   // ⚠️ 这个按钮落在她的命中框里，renderer 的 pointerdown 会把它当成"摸头"吞掉。
-  // 所以在按钮上拦住指针事件，别让它们冒泡到 window。
   ['pointerdown', 'pointerup', 'mousedown', 'mouseup'].forEach((type) => {
     btn.addEventListener(type, (e) => { e.stopPropagation(); });
   });
@@ -147,4 +144,7 @@
 
   boot();
   if (wantPicker) setTimeout(() => { bridge.packs().then(openPicker).catch(() => openPicker([])); }, 500);
+
+  // 暴露给调试/测试（在 devtools 里可以直接 WhalePetPacksUI.use('home')）
+  window.WhalePetPacksUI = { use: (id) => { const ok = usePack(id, '手动'); bridge.setPack(ok ? id : ''); return ok; }, list: () => list, current: () => current };
 })();
