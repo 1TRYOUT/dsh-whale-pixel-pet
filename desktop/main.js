@@ -393,6 +393,23 @@ ipcMain.on('pet:walk', (_e, spec) => {
     win.setPosition(Math.round(x + (remain > 0 ? 1 : -1) * step), y);
   }, stepMs);
 });
+ipcMain.handle('pet:packs', () => {
+  const dir = path.join(__dirname, '..', 'assets', 'art', 'packs');
+  const out = [];
+  try {
+    for (const id of fs.readdirSync(dir)) {
+      const manifest = path.join(dir, id, 'manifest.json');
+      if (!fs.existsSync(manifest)) continue;
+      try {
+        out.push({ id: id, manifest: JSON.parse(fs.readFileSync(manifest, 'utf8')) });
+      } catch (e) {
+        debugLog('立绘包解析失败 ' + id + ': ' + (e && e.message));
+      }
+    }
+  } catch (e) { /* 没有 packs 目录就表示没装皮肤包 */ }
+  return out;
+});
+
 ipcMain.on('pet:reset-pos', resetPos);
 
 ipcMain.on('pet:menu', (_e, spec) => {

@@ -15,6 +15,8 @@ contextBridge.exposeInMainWorld('petBridge', {
   /** 拖动 = 移动窗口 */
   drag: (dx, dy) => ipcRenderer.send('pet:drag', { dx, dy }),
   dragEnd: () => ipcRenderer.send('pet:drag-end'),
+  /** 列出可用立绘包（主进程扫 assets/art/packs） */
+  packs: () => ipcRenderer.invoke('pet:packs'),
   /** 散步：让主进程把整个窗口平移过去（spec: {dir, spot}） */
   walk: (spec) => ipcRenderer.send('pet:walk', spec),
   onWalkEnd: (cb) => {
