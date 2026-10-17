@@ -17,6 +17,16 @@ contextBridge.exposeInMainWorld('petBridge', {
   dragEnd: () => ipcRenderer.send('pet:drag-end'),
   /** 列出可用立绘包（主进程扫 assets/art/packs） */
   packs: () => ipcRenderer.invoke('pet:packs'),
+  /**
+   * 测试钩子用的环境变量透传（脚本可确定性验证，不用合成鼠标去点像素）。
+   * 沙箱里 process.env 不可用时返回空值——那就只剩 URL 参数那条路。
+   */
+  env: (() => {
+    try {
+      const e = (typeof process !== 'undefined' && process.env) ? process.env : {};
+      return { pack: e.DSH_PET_PACK || '', packs: e.DSH_PET_PACKS || '' };
+    } catch (err) { return { pack: '', packs: '' }; }
+  })(),
   /** 散步：让主进程把整个窗口平移过去（spec: {dir, spot}） */
   walk: (spec) => ipcRenderer.send('pet:walk', spec),
   onWalkEnd: (cb) => {
