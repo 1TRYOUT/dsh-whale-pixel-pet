@@ -30,3 +30,7 @@
 - 许可：**CC0 1.0（公共领域奉献）** —— 无需署名、可商用，此处署名出于礼貌。
 - 原文件名：`character_femalePerson_idle / walk0 / cheer0 / hit / duck`。
 - 作者：Kenney（kenney.nl）。
+
+## 立绘包：LPC 冒险者（CC-BY-SA 3.0）
+
+ssets/art/packs/cc-by-sa-lpc-hero/ 的姿势图取自 [Universal LPC Spritesheet Character Generator](https://github.com/LiberatedPixelCup/Universal-LPC-Spritesheet-Character-Generator)（Liberated Pixel Cup 社群作品），按 **CC-BY-SA 3.0** 使用，署名 Liberated Pixel Cup contributors。该目录的图片保持 CC-BY-SA，不适用仓库的 MIT。
