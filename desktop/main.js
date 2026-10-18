@@ -65,9 +65,35 @@ function defaultPos() {
 }
 
 /** 夹进工作区，别让她掉到屏幕外找不回来 */
+/** 窗口至少要留这么多像素在屏幕上，否则用户就找不到她了 */
+const MIN_VISIBLE = 60;
+
+/**
+ * 选一块"最合适"的屏幕，而不是"离鼠标最近"的那块。
+ * 关键差别：拖到两屏交界时，最近屏判定会把她拽回原屏（跨不过去）；
+ * 这里改成"谁能让这个位置留出足够可见区域，就选谁"。
+ */
+function pickDisplayFor(x, y) {
+  let displays = [];
+  try { displays = screen.getAllDisplays(); } catch (e) { displays = []; }
+  if (!displays.length) return screen.getPrimaryDisplay();
+
+  let best = null;
+  let bestDist = Infinity;
+  for (const d of displays) {
+    const wa = d.workArea;
+    // 把窗口夹到这块屏里，得到"如果选它"的最终位置
+    const cx = Math.min(Math.max(x, wa.x - MIN_VISIBLE + 1), wa.x + wa.width - MIN_VISIBLE);
+    const cy = Math.min(Math.max(y, wa.y), wa.y + wa.height - MIN_VISIBLE);
+    const dist = Math.abs(cx - x) + Math.abs(cy - y);
+    if (dist < bestDist) { bestDist = dist; best = d; }
+  }
+  return best || screen.getPrimaryDisplay();
+}
+
 function clampToWorkArea(x, y) {
   try {
-    const d = screen.getDisplayNearestPoint({ x: Math.round(x), y: Math.round(y) });
+    const d = pickDisplayFor(Math.round(x), Math.round(y));   // 允许跨屏（原来用 getDisplayNearestPoint 会把她拽回原屏）
     const wa = d.workArea;
     return {
       x: Math.min(Math.max(Math.round(x), wa.x - 40), wa.x + wa.width - WIN_W + 40),
@@ -467,6 +493,32 @@ ipcMain.handle('pet:packs', () => {
   } catch (e) { /* 没有 packs 目录就表示没装皮肤包 */ }
   return out;
 });
+
+/**
+ * 显示器布局变化（拔掉副屏、改分辨率、缩放）时把她拉回可见区域。
+ * 没有这段的话，副屏一拔，她的坐标就在屏幕之外，看起来就是"桌宠消失了"。
+ */
+function handleDisplaysChanged(reason) {
+  if (!win || win.isDestroyed()) return;
+  try {
+    const [x, y] = win.getPosition();
+    const p = clampToWorkArea(x, y);
+    if (p.x !== x || p.y !== y) {
+      win.setPosition(p.x, p.y);
+      savePos();
+      debugLog('显示器变化(' + reason + ')：窗口从 ' + x + ',' + y + ' 拉回 ' + p.x + ',' + p.y);
+    } else {
+      debugLog('显示器变化(' + reason + ')：位置仍然可见，不动');
+    }
+  } catch (e) {
+    debugLog('显示器变化处理失败: ' + (e && e.message));
+  }
+}
+try {
+  screen.on('display-removed', () => handleDisplaysChanged('display-removed'));
+  screen.on('display-added', () => handleDisplaysChanged('display-added'));
+  screen.on('display-metrics-changed', () => handleDisplaysChanged('display-metrics-changed'));
+} catch (e) { debugLog('注册显示器事件失败: ' + (e && e.message)); }
 
 ipcMain.on('pet:reset-pos', resetPos);
 
