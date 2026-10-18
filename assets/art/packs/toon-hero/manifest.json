@@ -1,0 +1,15 @@
+{
+    "hints":  {
+
+              },
+    "name":  "Kenney 冒险者（CC0）",
+    "author":  "Kenney (kenney.nl) — CC0",
+    "poses":  {
+                  "sleep":  "sleep.png",
+                  "play":  "play.png",
+                  "walk":  "walk.png",
+                  "idle":  "idle.png",
+                  "sad":  "sad.png",
+                  "happy":  "happy.png"
+              }
+}
