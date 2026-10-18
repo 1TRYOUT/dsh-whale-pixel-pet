@@ -1,0 +1,10 @@
+{
+    "hints":  {
+
+              },
+    "name":  "eSheep · green_sheep（MIT）",
+    "author":  "Adrianotiger/desktopPet — MIT",
+    "poses":  {
+                  "idle":  "idle.png"
+              }
+}
