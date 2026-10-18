@@ -20,6 +20,8 @@ contextBridge.exposeInMainWorld('petBridge', {
   /** 皮肤选择：存主进程文件（localStorage 在 file:// 下不可靠，会丢） */
   getPack: () => ipcRenderer.invoke('pet:pack:get'),
   setPack: (id) => ipcRenderer.invoke('pet:pack:set', id),
+  /** 一键导入本地皮肤：选目录 → 复制成 packs/local-<名字>/（不进 git） */
+  installPack: () => ipcRenderer.invoke('pet:pack:install'),
   /**
    * 测试钩子用的环境变量透传（脚本可确定性验证，不用合成鼠标去点像素）。
    * 沙箱里 process.env 不可用时返回空值——那就只剩 URL 参数那条路。

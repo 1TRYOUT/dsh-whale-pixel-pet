@@ -93,7 +93,11 @@
   /** 打开原生菜单挑皮肤 */
   function openPicker(all) {
     list = Array.isArray(all) ? all : [];
-    const items = [{ id: 'pack-', label: '内置立绘', type: 'checkbox', checked: !current }];
+    const items = [
+      { id: 'pack-install', label: '➕ 导入本地皮肤…' },
+      { type: 'separator' },
+      { id: 'pack-', label: '内置立绘', type: 'checkbox', checked: !current },
+    ];
     list.forEach((p) => {
       const ok = P.validate(p.manifest);
       items.push({
@@ -111,6 +115,16 @@
 
   // 菜单回传：立即原地换肤 + 落盘（不重开窗口）
   bridge.onAction((id) => {
+    // 导入本地皮肤：选目录 → 复制成 local-* 包 → 立刻刷新列表
+    if (id === 'pack-install') {
+      log('打开目录选择器，准备导入本地皮肤…');
+      bridge.installPack().then((r) => {
+        if (!r || !r.ok) { log('导入未完成：' + ((r && r.error) || '未知原因')); return; }
+        log('导入成功：' + r.id + '（' + r.files + ' 个文件）');
+        bridge.packs().then((all) => { list = Array.isArray(all) ? all : []; openPicker(list); });
+      }).catch((e) => log('导入出错：' + (e && e.message)));
+      return;
+    }
     if (!id || id.indexOf('pack-') !== 0) return;
     const next = id.slice(5);
     if (next === current) { log('已经是这个皮肤了：' + (next || '内置')); return; }

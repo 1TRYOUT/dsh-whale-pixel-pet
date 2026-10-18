@@ -396,6 +396,44 @@ ipcMain.on('pet:walk', (_e, spec) => {
 /** 皮肤选择：存文件而不是 localStorage —— 与窗口位置同一套机制，重启后一定读得回来 */
 const PACK_FILE = path.join(path.dirname(STATE_FILE), 'pack.json');
 
+/**
+ * 一键导入本地皮肤：选一个含 manifest.json 的文件夹，复制成 packs/local-<名字>/。
+ * 用 local- 前缀是关键——.gitignore 忽略 local-*，所以第三方/自用素材不会被提交，
+ * 功能上和仓库内的包完全一样。
+ */
+ipcMain.handle('pet:pack:install', async () => {
+  try {
+    const { dialog } = require('electron');
+    const picked = await dialog.showOpenDialog(win, {
+      title: '选择皮肤文件夹（里面要有 manifest.json）',
+      properties: ['openDirectory'],
+    });
+    if (!picked || picked.canceled || !picked.filePaths.length) return { ok: false, error: '已取消' };
+    const src = picked.filePaths[0];
+    if (!fs.existsSync(path.join(src, 'manifest.json'))) {
+      return { ok: false, error: '这个文件夹里没有 manifest.json' };
+    }
+    const raw = path.basename(src).replace(/[^\w\u4e00-\u9fa5-]+/g, '-').replace(/^-+|-+$/g, '');
+    const name = (raw || 'pack').slice(0, 40);
+    const dest = path.join(__dirname, '..', 'assets', 'art', 'packs', 'local-' + name);
+    fs.mkdirSync(dest, { recursive: true });
+    let copied = 0;
+    for (const entry of fs.readdirSync(src)) {
+      const from = path.join(src, entry);
+      try {
+        if (!fs.statSync(from).isFile()) continue;
+        fs.copyFileSync(from, path.join(dest, entry));
+        copied++;
+      } catch (e) { /* 单个文件失败不中断 */ }
+    }
+    debugLog('导入本地皮肤 ' + name + '（' + copied + ' 个文件）→ ' + dest);
+    return { ok: true, id: 'local-' + name, files: copied };
+  } catch (e) {
+    debugLog('导入皮肤失败: ' + (e && e.message));
+    return { ok: false, error: String((e && e.message) || e) };
+  }
+});
+
 ipcMain.handle('pet:pack:get', () => {
   try { return JSON.parse(fs.readFileSync(PACK_FILE, 'utf8')).id || ''; }
   catch (e) { return ''; }        // 没选过 / 文件坏了 → 就当内置
