@@ -1,0 +1,12 @@
+{
+  "name": "LPC 冒险者（CC-BY-SA）",
+  "author": "Liberated Pixel Cup 贡献者 — CC-BY-SA 3.0 / GPL 3.0",
+  "poses": {
+    "idle": "idle.png",
+    "walk": "walk.png",
+    "sleep": "sleep.png",
+    "happy": "happy.png",
+    "play": "play.png"
+  },
+  "hints": {}
+}
