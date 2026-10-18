@@ -471,6 +471,7 @@ ipcMain.handle('pet:packs', () => {
 ipcMain.on('pet:reset-pos', resetPos);
 
 ipcMain.on('pet:menu', (_e, spec) => {
+  debugLog('收到菜单请求，items=' + ((spec && spec.items) ? spec.items.length : 0));
   if (!win || win.isDestroyed()) return;
   const items = (spec && Array.isArray(spec.items)) ? spec.items : [];
   const send = (id) => { if (win && !win.isDestroyed()) win.webContents.send('pet:action', id); };

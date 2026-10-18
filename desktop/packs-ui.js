@@ -109,8 +109,13 @@
       });
     });
     if (list.length === 0) items.push({ type: 'separator' }, { id: 'pack-', label: '还没装任何皮肤包', enabled: false });
-    log('选择器已弹出：' + list.length + ' 个包（当前 ' + (current || '内置') + '）');
-    bridge.menu({ items: items });
+    log('准备弹出选择器：' + list.length + ' 个包（当前 ' + (current || '内置') + '），items=' + items.length);
+    try {
+      bridge.menu({ items: items });
+      log('已把菜单交给主进程（下一步看主进程有没有报错）');
+    } catch (e) {
+      log('调 bridge.menu 就失败了：' + (e && e.message));
+    }
   }
 
   // 菜单回传：立即原地换肤 + 落盘（不重开窗口）
@@ -143,7 +148,7 @@
     'padding:0', 'line-height:24px', 'font-size:13px',
     'background:rgba(24,34,48,0.86)', 'color:#dce9f7',
     'border:1px solid rgba(150,200,255,0.30)', 'border-radius:8px',
-    'cursor:pointer', 'pointer-events:auto', 'z-index:5',
+    'cursor:pointer', 'pointer-events:auto', 'z-index:2147483647',
   ].join(';');
   // ⚠️ 这个按钮落在她的命中框里，renderer 的 pointerdown 会把它当成"摸头"吞掉。
   ['pointerdown', 'pointerup', 'mousedown', 'mouseup'].forEach((type) => {
@@ -155,6 +160,16 @@
     bridge.packs().then(openPicker).catch(() => openPicker([]));
   });
   document.body.appendChild(btn);
+  // 看门狗：renderer 有"自愈"逻辑会重挂元素，可能把 canvas 盖到按钮上面。
+  // 每秒确认按钮仍是 body 的最后一个子元素（= 画在最上层）。
+  setInterval(() => {
+    try {
+      if (btn.parentNode !== document.body || document.body.lastElementChild !== btn) {
+        document.body.appendChild(btn);
+        log('看门狗：把按钮重新置顶');
+      }
+    } catch (e) { /* ignore */ }
+  }, 1000);
 
   boot();
   if (wantPicker) setTimeout(() => { bridge.packs().then(openPicker).catch(() => openPicker([])); }, 500);
