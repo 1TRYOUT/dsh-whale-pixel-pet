@@ -386,13 +386,33 @@ ipcMain.on('pet:quit', () => { quitting = true; app.quit(); });
 /* --------------------------- 散步：整个窗口走出去 --------------------------- */
 
 let walkTimer = null;
+/** 测试钩子：DSH_PET_WALK=1 时强制下一次散步跨屏（确定性验证用） */
+const forceCrossWalk = process.env.DSH_PET_WALK === '1';
 
 ipcMain.on('pet:walk', (_e, spec) => {
   if (!win || win.isDestroyed()) return;
   if (walkTimer) { clearInterval(walkTimer); walkTimer = null; }
   const [x0, y0] = win.getPosition();
   let wa;
-  try { wa = screen.getDisplayNearestPoint({ x: x0, y: y0 }).workArea; } catch (e) { wa = screen.getPrimaryDisplay().workArea; }
+  let cur;
+  try { cur = screen.getDisplayNearestPoint({ x: x0, y: y0 }); wa = cur.workArea; }
+  catch (e) { cur = screen.getPrimaryDisplay(); wa = cur.workArea; }
+
+  /** 行进方向上"紧挨着"的另一块屏（竖直重叠不足 120px 就不算，中间是虚空） */
+  const adjacentDisplay = (from, direction) => {
+    try {
+      let best = null, bestGap = Infinity;
+      for (const d of screen.getAllDisplays()) {
+        if (d.id === from.id) continue;
+        const a = from.workArea, b = d.workArea;
+        if (Math.min(a.y + a.height, b.y + b.height) - Math.max(a.y, b.y) < 120) continue;
+        const gap = direction > 0 ? (b.x - (a.x + a.width)) : (a.x - (b.x + b.width));
+        if (gap < -40 || gap > 400) continue;
+        if (Math.abs(gap) < bestGap) { bestGap = Math.abs(gap); best = d; }
+      }
+      return best;
+    } catch (e) { return null; }
+  };
 
   const dir = spec && spec.dir === -1 ? -1 : 1;
   const margin = 30;
@@ -401,7 +421,17 @@ ipcMain.on('pet:walk', (_e, spec) => {
   let targetX = (spec && typeof spec.spot === 'number')
     ? spec.spot
     : x0 + dir * Math.round(wa.width * 0.3);
-  targetX = Math.min(Math.max(Math.round(targetX), minX), Math.max(minX, maxX));
+  const nextDisplay = adjacentDisplay(cur, dir);
+  const wantCross = !!nextDisplay && (forceCrossWalk || ((!spec || typeof spec.spot !== 'number') && Math.random() < 0.35));
+  if (wantCross) {
+    const b = nextDisplay.workArea;
+    const nbMin = b.x - 40 + margin;
+    const nbMax = Math.max(nbMin, b.x + b.width - WIN_W + 40 - margin);
+    targetX = Math.round((nbMin + nbMax) / 2);
+    debugLog('散步跨屏：屏 ' + cur.id + ' → ' + nextDisplay.id + '，目标 x=' + targetX + '（本屏 ' + minX + '..' + maxX + '）');
+  } else {
+    targetX = Math.min(Math.max(Math.round(targetX), minX), Math.max(minX, maxX));
+  }
 
   const stepMs = 16;
   const speed = 150;                            // px/s
@@ -554,6 +584,30 @@ try {
   screen.on('display-added', () => handleDisplaysChanged('display-added'));
   screen.on('display-metrics-changed', () => handleDisplaysChanged('display-metrics-changed'));
 } catch (e) { debugLog('注册显示器事件失败: ' + (e && e.message)); }
+
+/** 可见性看门狗：每 3 秒确认她至少 MIN_VISIBLE 可见（跨屏时两屏 y 有偏移，可能落进虚空） */
+setInterval(() => {
+  if (!win || win.isDestroyed() || !win.isVisible()) return;
+  try {
+    const [x, y] = win.getPosition();
+    const visible = screen.getAllDisplays().some((d) => {
+      const a = d.workArea;
+      const ox = Math.min(x + WIN_W, a.x + a.width) - Math.max(x, a.x);
+      const oy = Math.min(y + WIN_H, a.y + a.height) - Math.max(y, a.y);
+      return ox >= MIN_VISIBLE && oy >= MIN_VISIBLE;
+    });
+    if (!visible) {
+      const p = clampToWorkArea(x, y);
+      win.setPosition(p.x, p.y);
+      savePos();
+      debugLog('看门狗：跑到看不见的地方了，从 ' + x + ',' + y + ' 拉回 ' + p.x + ',' + p.y);
+    }
+  } catch (e) { /* ignore */ }
+}, 3000);
+
+if (process.env.DSH_PET_WALK === '1') {
+  setTimeout(() => { if (win && !win.isDestroyed()) win.webContents.send('pet:action', 'walk'); }, 4000);
+}
 
 ipcMain.on('pet:reset-pos', resetPos);
 
