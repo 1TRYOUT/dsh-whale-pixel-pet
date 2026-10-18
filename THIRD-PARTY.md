@@ -22,3 +22,11 @@
 - https://github.com/xiaoshihou514/dsh-desktop-pet —— 桌面窗口形态的启发
 - https://github.com/ChisaAlter/WhaleIsle —— 会话联动与养成的启发
 - https://github.com/Sutera-Diffusus/dsh-whale-musume —— 立绘资源（见上）
+## 立绘包：Kenney 卡通女孩（CC0）
+
+`assets/art/packs/toon-female/` 的 5 张姿势图取自
+[Kenney](https://kenney.nl/) 的 *Toon Characters*（经 [shorepine/kenney](https://github.com/shorepine/kenney) 镜像获取）。
+
+- 许可：**CC0 1.0（公共领域奉献）** —— 无需署名、可商用，此处署名出于礼貌。
+- 原文件名：`character_femalePerson_idle / walk0 / cheer0 / hit / duck`。
+- 作者：Kenney（kenney.nl）。

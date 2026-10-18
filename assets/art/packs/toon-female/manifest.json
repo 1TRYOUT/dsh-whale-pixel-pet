@@ -1,0 +1,14 @@
+{
+    "hints":  {
+
+              },
+    "name":  "Kenney 卡通女孩（CC0）",
+    "author":  "Kenney (kenney.nl) — CC0",
+    "poses":  {
+                  "idle":  "idle.png",
+                  "walk":  "walk.png",
+                  "happy":  "happy.png",
+                  "sleep":  "sleep.png",
+                  "sad":  "sad.png"
+              }
+}
