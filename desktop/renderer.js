@@ -145,7 +145,7 @@
       moved += Math.abs(dx) + Math.abs(dy);
       if (moved > 4) {
         dragging = true;
-        bridge.drag(dx, dy);        // 移动的是窗口
+        // 移动由主进程的 dragStart 轮询负责（见 main.js），这里不再发增量
       }
       lastPt = { x: e.clientX, y: e.clientY };
     }
@@ -162,6 +162,7 @@
     moved = 0;
     lastPt = { x: e.clientX, y: e.clientY };
     bridge.setDragLock(true);       // 拖动期间不许穿透
+      bridge.dragStart();            // 交给主进程按光标拖（跨屏不会因为光标跑出窗口而断）
     e.preventDefault();
   });
 

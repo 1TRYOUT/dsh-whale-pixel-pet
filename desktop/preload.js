@@ -33,6 +33,8 @@ contextBridge.exposeInMainWorld('petBridge', {
     } catch (err) { return { pack: '', packs: '' }; }
   })(),
   /** 散步：让主进程把整个窗口平移过去（spec: {dir, spot}） */
+  /** 开始拖动：主进程按光标位置移动窗口（跨屏不会断） */
+  dragStart: () => ipcRenderer.send('pet:drag-start'),
   walk: (spec) => ipcRenderer.send('pet:walk', spec),
   onWalkEnd: (cb) => {
     const handler = (_e, payload) => cb(payload);

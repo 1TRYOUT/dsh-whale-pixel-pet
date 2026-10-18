@@ -322,6 +322,37 @@ ipcMain.on('pet:drag-lock', (_e, locked) => {
   syncIgnore();
 });
 
+/**
+ * 拖动改由主进程轮询光标驱动。
+ * 原因：原来靠渲染进程的 pointermove 发增量，跨屏时必须长距离连续移动，
+ * 光标一定会跑出窗口 → pointerleave → 拖动当场断掉，所以永远跨不过去。
+ * 主进程直接读光标位置就没有这个问题（命中检测也是同一套机制）。
+ */
+let dragTimer = null;
+let dragOffset = null;
+
+ipcMain.on('pet:drag-start', () => {
+  if (!win || win.isDestroyed()) return;
+  try {
+    const c = screen.getCursorScreenPoint();
+    const [x, y] = win.getPosition();
+    dragOffset = { x: c.x - x, y: c.y - y };          // 抓住她时，光标在她身上的相对位置
+    if (dragTimer) clearInterval(dragTimer);
+    dragTimer = setInterval(() => {
+      if (!win || win.isDestroyed() || !dragOffset) return;
+      try {
+        const p0 = screen.getCursorScreenPoint();
+        const p = clampToWorkArea(p0.x - dragOffset.x, p0.y - dragOffset.y);
+        const [cx, cy] = win.getPosition();
+        if (p.x !== cx || p.y !== cy) win.setPosition(p.x, p.y);
+      } catch (e) { /* ignore */ }
+    }, 16);
+    debugLog('拖动开始，抓取偏移 ' + dragOffset.x + ',' + dragOffset.y);
+  } catch (e) {
+    debugLog('拖动开始失败: ' + (e && e.message));
+  }
+});
+
 ipcMain.on('pet:drag', (_e, d) => {
   if (!win || win.isDestroyed() || !d) return;
   const [x, y] = win.getPosition();
@@ -329,7 +360,11 @@ ipcMain.on('pet:drag', (_e, d) => {
   win.setPosition(p.x, p.y);
 });
 
-ipcMain.on('pet:drag-end', () => { savePos(); });
+ipcMain.on('pet:drag-end', () => {
+  if (dragTimer) { clearInterval(dragTimer); dragTimer = null; }
+  dragOffset = null;
+  savePos();
+});
 
 /** 反向通道：桌面 -> 宿主（宿主轮询这个文件），因为桌面进程拿不到 /api 鉴权 */
 const COMMAND_FILE = path.join(path.dirname(STATE_FILE), 'command.json');
