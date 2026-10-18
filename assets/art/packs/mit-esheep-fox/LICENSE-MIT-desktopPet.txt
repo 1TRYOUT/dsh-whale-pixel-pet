@@ -1,4 +1,0 @@
-本目录图片来自 Adrianotiger/desktopPet 的 Pets/*/icon.png（MIT License）。
-来源：https://github.com/Adrianotiger/desktopPet
-该仓库以 MIT 许可发布，可再分发；此处仅作署名记录。
-注意：该仓库只提供 icon（静态头像），动作帧不在其中。

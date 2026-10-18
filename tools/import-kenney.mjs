@@ -114,7 +114,7 @@ function crc32(buf) {
 
 /** 解出 RGBA8 像素。支持 colorType 0/2/3/4/6，bit depth 1/2/4/8/16（16 按高 8 位处理）。 */
 function decodePng(buf) {
-  if (buf.length < 8 || buf.readUInt32BE(0) !== 0x89504E47) die('不是 PNG 文件');
+  if (buf.length < 8 || buf.readUInt32BE(0) !== 0x89504E47) throw new Error('不是 PNG 文件（WebP/JPEG 等本工具不解析）');
   let pos = 8, ihdr = null, plte = null, trns = null;
   const idat = [];
   while (pos + 8 <= buf.length) {
@@ -129,11 +129,11 @@ function decodePng(buf) {
     else if (type === 'IEND') break;
     pos += 12 + len;
   }
-  if (!ihdr) die('PNG 缺少 IHDR');
-  if (ihdr.interlace) die('暂不支持隔行扫描（Adam7）PNG');
+  if (!ihdr) throw new Error('PNG 缺少 IHDR');
+  if (ihdr.interlace) throw new Error('暂不支持隔行扫描（Adam7）PNG');
 
   const channels = { 0: 1, 2: 3, 3: 1, 4: 2, 6: 4 }[ihdr.color];
-  if (!channels) die('不支持的 PNG 颜色类型: ' + ihdr.color);
+  if (!channels) throw new Error('不支持的 PNG 颜色类型: ' + ihdr.color);
   const depth = ihdr.depth;
   const stride = Math.ceil(ihdr.w * channels * depth / 8);
   const bpp = Math.max(1, Math.ceil(channels * depth / 8));
