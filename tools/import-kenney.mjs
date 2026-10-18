@@ -19,8 +19,8 @@
  * ---------------------------------------------------------------------------
  */
 import { inflateSync, deflateSync } from 'node:zlib';
-import { writeFileSync, mkdirSync, existsSync } from 'node:fs';
-import { fileURLToPath } from 'node:url';
+import { writeFileSync, mkdirSync, existsSync, readFileSync } from 'node:fs';
+import { fileURLToPath, pathToFileURL } from 'node:url';
 import { dirname, join } from 'node:path';
 import { execFileSync } from 'node:child_process';
 
@@ -270,13 +270,19 @@ async function main() {
   const destDir = join(PACKS_DIR, id);
   const poses = {};
 
-  if (args.sheet) {
+  if (args.sheet || args['sheet-file']) {
     // ---- sprite sheet 模式 ----
     const tile = String(args.tile || '16x16').split('x').map(Number);
     if (tile.length !== 2 || !tile[0] || !tile[1]) die('--tile 要写成 16x16');
-    const sheetPath = '2d/' + pack + '/' + args.sheet;
-    console.log('下载 sheet: ' + sheetPath);
-    const sheet = decodePng(await ghFile(sheetPath));
+    let sheet = null;
+    if (args['sheet-file']) {
+      console.log('读取本地 sheet: ' + args['sheet-file']);
+      sheet = decodePng(readFileSync(String(args['sheet-file'])));
+    } else {
+      const sheetPath = '2d/' + pack + '/' + args.sheet;
+      console.log('下载 sheet: ' + sheetPath);
+      sheet = decodePng(await ghFile(sheetPath));
+    }
     const cols = Math.floor(sheet.w / tile[0]);
     const rows = Math.floor(sheet.h / tile[1]);
     console.log('  尺寸 ' + sheet.w + 'x' + sheet.h + ' → 网格 ' + cols + 'x' + rows + '（每格 ' + tile[0] + 'x' + tile[1] + '）');
@@ -367,4 +373,9 @@ async function main() {
   }
 }
 
-main().catch((e) => { console.error('✖ ' + (e && e.message)); process.exit(1); });
+// 只有直接运行才走 main；被 import 时（测试）只导出函数
+if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
+  main().catch((e) => { console.error('✖ ' + (e && e.message)); process.exit(1); });
+}
+
+export { decodePng, encodePng, crop, POSE_KEYS };
