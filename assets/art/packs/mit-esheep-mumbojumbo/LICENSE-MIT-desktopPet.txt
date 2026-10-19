@@ -1,0 +1,3 @@
+本目录图片由 Pets/mumbojumbo/animations.xml 内嵌的 sprite sheet 切出（idle 等姿势取各动作首帧）。
+来源：https://github.com/Adrianotiger/desktopPet （MIT License，可再分发）
+色键 magenta 已抠成透明。

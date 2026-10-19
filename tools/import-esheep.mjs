@@ -72,15 +72,21 @@ const POSE_MAP = [
 ];
 
 function parseXml(xml) {
-  // eSheep 把 sheet 放在 CDATA 里，标签名不固定（实测是 <png>）——取最长的那个 CDATA 块
+  // 一个 XML 里可能有多块 CDATA（实测：icon 是 ICO 格式、png 才是立绘）。
+  // 按 PNG 魔数选，而不是"取最长的那块"——后者会选中 icon。
   let b64 = '';
   const cdataRe = /<([a-zA-Z0-9_:-]+)[^>]*>\s*<!\[CDATA\[([\s\S]*?)\]\]>\s*<\/\1>/g;
   let cm;
   while ((cm = cdataRe.exec(xml))) {
     const body = cm[2].replace(/\s/g, '');
-    if (body.length > b64.length) b64 = body;
+    if (!body) continue;
+    try {
+      const head = Buffer.from(body.slice(0, 24), 'base64');
+      const isPng = head.length >= 8 && head.readUInt32BE(0) === 0x89504E47;
+      if (isPng && body.length > b64.length) b64 = body;
+    } catch (e) { /* 忽略坏块 */ }
   }
-  if (!b64) throw new Error('XML 里没有内嵌的 sprite sheet（CDATA）');
+  if (!b64) throw new Error('XML 里没有内嵌的 PNG（只有 icon 之类）');
   const trans = (xml.match(/<transparency>\s*([^<\s]+)\s*<\/transparency>/) || [])[1] || 'magenta';
 
   const anims = [];
@@ -130,7 +136,11 @@ function deriveTile(anims, img, maxFrame) {
   return null;
 }
 
-/** 兜底：找一个 tile 尺寸，使所有 tile 边界行列基本为空，且格子数不超过帧数的 1.5 倍 */
+/**
+ * 兜底探测：横竖两个方向**独立**找周期（支持非正方帧）。
+ * 对每个候选周期统计"倍数位置是否基本为空"的比例，取最高分；
+ * 若整张图没有空白分隔（紧排 sheet），退化为"格子数最接近帧数"的候选。
+ */
 function detectGrid(img, key, maxFrame, tol = 12) {
   const isBg = (x, y) => {
     const o = (y * img.w + x) * 4;
@@ -138,26 +148,56 @@ function detectGrid(img, key, maxFrame, tol = 12) {
     if (a < 8) return true;
     return Math.abs(r - key[0]) <= tol && Math.abs(g - key[1]) <= tol && Math.abs(b - key[2]) <= tol;
   };
-  const cands = [];
-  for (let s = 8; s <= 160; s++) {
-    if (img.w % s || img.h % s) continue;
-    const cols = img.w / s, rows = img.h / s;
-    if (cols * rows < maxFrame + 1) continue;
-    if (cols * rows > (maxFrame + 1) * 1.5) continue;      // 干掉"8px/6400 格"那种荒谬解
-    let ok = true;
-    for (let c = 1; c < cols && ok; c++) {
-      let empty = 0;
-      for (let y = 0; y < img.h; y++) if (isBg(c * s, y)) empty++;
-      if (empty / img.h < 0.6) ok = false;
-    }
-    for (let r = 1; r < rows && ok; r++) {
-      let empty = 0;
-      for (let x = 0; x < img.w; x++) if (isBg(x, r * s)) empty++;
-      if (empty / img.w < 0.6) ok = false;
-    }
-    if (ok) cands.push({ size: s, tileH: s, cols, rows, slots: cols * rows, from: 'gap' });
+  const colEmpty = new Float64Array(img.w);
+  for (let x = 0; x < img.w; x++) {
+    let e = 0;
+    for (let y = 0; y < img.h; y++) if (isBg(x, y)) e++;
+    colEmpty[x] = e / img.h;
   }
-  return cands.sort((a, b) => a.size - b.size)[0] || null;
+  const rowEmpty = new Float64Array(img.h);
+  for (let y = 0; y < img.h; y++) {
+    let e = 0;
+    for (let x = 0; x < img.w; x++) if (isBg(x, y)) e++;
+    rowEmpty[y] = e / img.w;
+  }
+  const score = (period, table) => {
+    const n = Math.floor((table.length - 1) / period);
+    if (n < 1) return 0;
+    let hit = 0;
+    for (let k = 1; k <= n; k++) if (table[k * period] >= 0.6) hit++;
+    return hit / n;
+  };
+  const best = (table, lo, hi) => {
+    let pick = null;
+    for (let p = lo; p <= hi; p++) {
+      if (table.length % p) continue;
+      const s = score(p, table);
+      if (s >= 0.6 && (!pick || s > pick.s)) pick = { p, s };
+    }
+    return pick;
+  };
+  let w = best(colEmpty, 16, 200);
+  let h = best(rowEmpty, 16, 200);
+  const frames = maxFrame + 1;
+  if (w && h) {
+    const cols = img.w / w.p, rows = img.h / h.p;
+    if (cols * rows >= frames && cols * rows <= frames * 2.5) {
+      return { size: w.p, tileH: h.p, cols, rows, slots: cols * rows, from: 'gap2d' };
+    }
+  }
+  // 紧排 sheet：没有空白分隔 → 取"格子数最接近帧数"的组合
+  let fallback = null;
+  for (let tw = 16; tw <= 200; tw++) {
+    if (img.w % tw) continue;
+    for (let th = 16; th <= 200; th++) {
+      if (img.h % th) continue;
+      const cols = img.w / tw, rows = img.h / th, slots = cols * rows;
+      if (slots < frames || slots > frames * 1.6) continue;
+      const d = slots - frames;
+      if (!fallback || d < fallback.d) fallback = { size: tw, tileH: th, cols, rows, slots, from: 'count', d };
+    }
+  }
+  return fallback;
 }
 
 function cropFrame(img, x0, x1, key, tol = 12, yMin = 0, yMax = null) {
@@ -207,6 +247,26 @@ const dryRun = !!args['dry-run'];
 
 const xml = await ghText('Pets/' + pet + '/animations.xml');
 const parsed = parseXml(xml);
+
+// --inspect：把内嵌数据块的类型与每个动作的起点打出来（诊断用，不写文件）
+if (args.inspect) {
+  console.log('宠物 ' + pet + '：色键=' + parsed.trans + '，动作 ' + parsed.anims.length + ' 个');
+  const re2 = /<([a-zA-Z0-9_:-]+)[^>]*>\s*<!\[CDATA\[([\s\S]*?)\]\]>\s*<\/\1>/g;
+  let m2, i = 0;
+  while ((m2 = re2.exec(xml))) {
+    const body = m2[2].replace(/\s/g, '');
+    let hex = '';
+    try {
+      const buf = Buffer.from(body, 'base64');
+      hex = buf.subarray(0, 8).toString('hex');
+      console.log('  CDATA#' + (i++) + ' 标签=' + m2[1] + ' base64 ' + body.length + ' 字符 → ' + buf.length + ' 字节，头 ' + hex);
+    } catch (e) { console.log('  CDATA#' + (i++) + ' 标签=' + m2[1] + ' 解码失败'); }
+  }
+  for (const a of parsed.anims) {
+    console.log('  动作 ' + a.name + '：' + a.frames.length + ' 帧，起点 ' + (a.start ? a.start.x + ',' + a.start.y : '(无 start)') + '，帧号 ' + a.frames.slice(0, 4).join('/'));
+  }
+  process.exit(0);
+}
 const key = COLOR_KEYS[parsed.trans] || COLOR_KEYS.magenta;
 console.log('宠物 ' + pet + '：色键=' + parsed.trans + '，动作 ' + parsed.anims.length + ' 个');
 
@@ -214,7 +274,9 @@ const sheet = decodePng(Buffer.from(parsed.b64, 'base64'));
 console.log('  sheet ' + sheet.w + 'x' + sheet.h + '，动作: ' + parsed.anims.map((a) => a.name + '(' + a.frames.length + ')').join(' '));
 
 const maxFrame = Math.max(...parsed.anims.flatMap((a) => a.frames));
-const grid = deriveTile(parsed.anims, sheet, maxFrame) || detectGrid(sheet, key, maxFrame);
+// 注意：动作的 start 坐标是**绘制偏移**不是 sheet 坐标（实测多数为 0,0），
+// 所以不能用它反推帧尺寸；一律走横竖独立周期探测。
+const grid = detectGrid(sheet, key, maxFrame);
 if (!grid) die('探测不到帧网格（切帧不可信，不写任何文件）');
 console.log('  网格 ' + grid.cols + 'x' + grid.rows + '，每格 ' + grid.size + 'x' + grid.tileH + 'px，共 ' + grid.slots + ' 格（需要 ' + (maxFrame + 1) + ' 帧，判据=' + grid.from + '）');
 const tileRect = (i) => [(i % grid.cols) * grid.size, Math.floor(i / grid.cols) * grid.tileH];

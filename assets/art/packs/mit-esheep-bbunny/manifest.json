@@ -1,0 +1,10 @@
+{
+  "name": "eSheep · bbunny（MIT）",
+  "author": "Adrianotiger/desktopPet — MIT",
+  "poses": {
+    "groom": "groom.png",
+    "walk": "walk.png",
+    "idle": "idle.png"
+  },
+  "hints": {}
+}
