@@ -158,6 +158,17 @@ function createWindow() {
 
 function refreshTray() {
   if (!tray) return;
+  // Windows 上 setContextMenu 只响应右键；左键要自己弹，否则"点了没反应"
+  try {
+    tray.removeAllListeners('click');
+    tray.on('click', () => { try { tray.popUpContextMenu(); } catch (e) { console.log('[tray] 弹出失败: ' + (e && e.message)); } });
+    tray.on('double-click', () => { try { toggleVisible(); } catch (e) { /* ignore */ } });
+  } catch (e) { console.log('[tray] 注册点击失败: ' + (e && e.message)); }
+  // 测试钩子：直接把菜单弹出来（截图验证内容，不需要人去点托盘）
+  if (process.env.DSH_PET_TRAY === '1' && !global.__trayPopped) {
+    global.__trayPopped = true;
+    setTimeout(() => { try { console.log('[tray] 钩子弹出菜单'); tray.popUpContextMenu(); } catch (e) { console.log('[tray] 钩子弹出失败: ' + (e && e.message)); } }, 3500);
+  }
   const visible = !!(win && !win.isDestroyed() && win.isVisible());
   /** 把动作发给渲染进程（复用已有的 onAction 通道） */
   const sendAction = (id) => { if (win && !win.isDestroyed()) win.webContents.send('pet:action', id); };
