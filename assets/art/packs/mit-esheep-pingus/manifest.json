@@ -1,0 +1,11 @@
+{
+  "name": "eSheep · pingus（MIT）",
+  "author": "Adrianotiger/desktopPet — MIT",
+  "poses": {
+    "walk": "walk.png",
+    "sad": "sad.png",
+    "idle": "idle.png",
+    "work": "work.png"
+  },
+  "hints": {}
+}
