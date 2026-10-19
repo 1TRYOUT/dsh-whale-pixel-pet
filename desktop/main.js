@@ -713,6 +713,64 @@ if (process.env.DSH_PET_WALK === '1') {
   }, 4000);
 }
 
+/* --------------------------- 全局热键 + 待审批置顶 --------------------------- */
+
+/**
+ * 全局热键：不用去够那个 208px 的小窗口。
+ * 只绑主进程能直接做的事；其余走已有的 pet:action 通道交给渲染进程。
+ */
+function registerHotkeys() {
+  const { globalShortcut } = require('electron');
+  const sendAction = (id) => { if (win && !win.isDestroyed()) win.webContents.send('pet:action', id); };
+  const map = [
+    ['Control+Alt+W', '叫她出来 / 藏起来', () => toggleVisible()],
+    ['Control+Alt+F', '喂点东西', () => sendAction('feed')],
+    ['Control+Alt+R', '回到右下角', () => resetPos()],
+    ['Control+Alt+S', '让她睡', () => sendAction('sleep')],
+  ];
+  const ok = [];
+  const fail = [];
+  for (const [accel, label, fn] of map) {
+    try {
+      const registered = globalShortcut.register(accel, fn);
+      if (registered) ok.push(accel + '(' + label + ')');
+      else fail.push(accel);
+    } catch (e) { fail.push(accel + ':' + (e && e.message)); }
+  }
+  console.log('[hotkey] 已注册 ' + ok.length + ' 个：' + ok.join(' / '));
+  if (fail.length) console.log('[hotkey] 注册失败：' + fail.join(' / '));
+  const t = process.env.DSH_PET_HOTKEY_TEST;
+  if (t) {
+    const hit = map.find(([accel]) => accel.toLowerCase().endsWith('+' + t.toLowerCase()));
+    if (hit) { console.log('[hotkey] 钩子触发 ' + hit[0]); setTimeout(hit[2], 3000); }
+    else console.log('[hotkey] 钩子找不到 ' + t);
+  }
+  return ok.length;
+}
+
+/** 待审批时把她顶到最前：审批要你立刻知道，藏在别的窗口后面就失去意义 */
+let approvalRaised = false;
+setInterval(() => {
+  if (!win || win.isDestroyed()) return;
+  let s = null;
+  try { s = JSON.parse(fs.readFileSync(STATE_FILE, 'utf8')); } catch (e) { return; }
+  const pending = s && s.state === 'approval';
+  if (pending && !approvalRaised) {
+    approvalRaised = true;
+    try {
+      if (!win.isVisible()) win.show();
+      win.setAlwaysOnTop(true, 'screen-saver');
+      win.moveTop();
+      console.log('[approval] 有待审批，把她顶到最前');
+    } catch (e) { console.log('[approval] 置顶失败: ' + (e && e.message)); }
+  } else if (!pending && approvalRaised) {
+    approvalRaised = false;
+    console.log('[approval] 审批已结束');
+  }
+}, 1500);
+
+registerHotkeys();
+
 ipcMain.on('pet:reset-pos', resetPos);
 
 ipcMain.on('pet:menu', (_e, spec) => {
