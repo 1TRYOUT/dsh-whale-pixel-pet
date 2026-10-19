@@ -147,6 +147,7 @@ function createWindow() {
   win.once('ready-to-show', () => {
     win.show();
     pushState(true);
+    registerHotkeys();          // 必须在 app ready 之后（顶层调用会报 cannot be used before the app is ready）
   });
   win.on('moved', savePos);
   win.on('closed', () => { if (hoverTimer) clearInterval(hoverTimer); });
@@ -741,7 +742,7 @@ function registerHotkeys() {
   if (fail.length) console.log('[hotkey] 注册失败：' + fail.join(' / '));
   const t = process.env.DSH_PET_HOTKEY_TEST;
   if (t) {
-    const hit = map.find(([accel]) => accel.toLowerCase().endsWith('+' + t.toLowerCase()));
+    const hit = map.find(([accel]) => accel.toLowerCase().endsWith('+' + String(t).toLowerCase()));
     if (hit) { console.log('[hotkey] 钩子触发 ' + hit[0]); setTimeout(hit[2], 3000); }
     else console.log('[hotkey] 钩子找不到 ' + t);
   }
@@ -769,7 +770,6 @@ setInterval(() => {
   }
 }, 1500);
 
-registerHotkeys();
 
 ipcMain.on('pet:reset-pos', resetPos);
 
