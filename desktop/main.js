@@ -165,6 +165,15 @@ function refreshTray() {
     tray.on('double-click', () => { try { toggleVisible(); } catch (e) { /* ignore */ } });
   } catch (e) { console.log('[tray] 注册点击失败: ' + (e && e.message)); }
   // 测试钩子：直接把菜单弹出来（截图验证内容，不需要人去点托盘）
+  // 钩子：模拟点击托盘皮肤项（与菜单项点击走同一行 sendAction）
+  if (process.env.DSH_PET_TRAY_PACK && !global.__trayPackSent) {
+    global.__trayPackSent = true;
+    const target = process.env.DSH_PET_TRAY_PACK;
+    setTimeout(() => {
+      console.log('[tray] 钩子：模拟点击皮肤项 pack-' + target);
+      sendAction('pack-' + target);
+    }, 4000);
+  }
   if (process.env.DSH_PET_TRAY === '1' && !global.__trayPopped) {
     global.__trayPopped = true;
     setTimeout(() => { try { console.log('[tray] 钩子弹出菜单'); tray.popUpContextMenu(); } catch (e) { console.log('[tray] 钩子弹出失败: ' + (e && e.message)); } }, 3500);
