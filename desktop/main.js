@@ -638,6 +638,24 @@ function installPackFromDir(src) {
 
 ipcMain.handle('pet:pack:install-path', (_e, src) => installPackFromDir(String(src || '')));
 
+/* 诊断：模拟"点击菜单里的皮肤项"（与菜单项 click 走同一行 send），并看渲染进程是否还活着 */
+if (process.env.DSH_PET_MENU_CLICK) {
+  const target = process.env.DSH_PET_MENU_CLICK;
+  setTimeout(() => {
+    console.log('[diag] 模拟点击菜单项 pack-' + target);
+    if (win && !win.isDestroyed()) win.webContents.send('pet:action', 'pack-' + target);
+  }, 4000);
+  setTimeout(() => {
+    if (!win || win.isDestroyed()) { console.log('[diag] 窗口没了'); return; }
+    const t0 = Date.now();
+    win.webContents.executeJavaScript('1+1').then((v) => {
+      console.log('[diag] 渲染进程存活，ping 耗时 ' + (Date.now() - t0) + 'ms，返回 ' + v);
+    }).catch((e) => {
+      console.log('[diag] 渲染进程无响应/已崩：' + (e && e.message));
+    });
+  }, 12000);
+}
+
 // 测试钩子：启动时按路径导入一次（确定性验证，不需要真的拖拽）
 if (process.env.DSH_PET_INSTALL_PATH) {
   setTimeout(() => { installPackFromDir(process.env.DSH_PET_INSTALL_PATH); }, 3000);
@@ -839,6 +857,22 @@ ipcMain.on('pet:menu', (_e, spec) => {
   if (!win || win.isDestroyed()) return;
   const items = (spec && Array.isArray(spec.items)) ? spec.items : [];
   try { console.log('[menu] 项目: ' + items.map((i) => (i.type || 'normal') + ':' + String(i.label || '')).join(' | ')); } catch (e) { /* ignore */ }
+  // 她的窗口是 alwaysOnTop('screen-saver')，这个级别会和原生菜单抢输入，
+  // 表现就是"点菜单项没反应 / 像卡住"。弹菜单前临时降级，菜单结束后恢复。
+  try {
+    win.setAlwaysOnTop(false);
+    win.setIgnoreMouseEvents(false);
+    console.log('[menu] 弹出前：已临时关掉置顶与穿透');
+  } catch (e) { console.log('[menu] 降级失败: ' + (e && e.message)); }
+  setTimeout(() => {
+    try {
+      if (win && !win.isDestroyed()) {
+        win.setAlwaysOnTop(true, 'screen-saver');
+        if (typeof syncIgnore === 'function') syncIgnore();
+        console.log('[menu] 已恢复置顶与穿透');
+      }
+    } catch (e) { console.log('[menu] 恢复失败: ' + (e && e.message)); }
+  }, 9000);
   const send = (id) => { if (win && !win.isDestroyed()) win.webContents.send('pet:action', id); };
 
   const build = (list) => list.map((it) => {

@@ -201,6 +201,14 @@
     });
   });
 
+  /* --------------------------- 错误捕获（之前没有） --------------------------- */
+  window.addEventListener('error', (e) => {
+    log('渲染进程异常：' + (e && e.message) + ' @' + (e && e.filename ? e.filename.split('/').pop() : '?') + ':' + (e && e.lineno));
+  });
+  window.addEventListener('unhandledrejection', (e) => {
+    log('未处理的 Promise 拒绝：' + ((e && e.reason && (e.reason.message || e.reason)) || '?'));
+  });
+
   boot();
   if (wantPicker) setTimeout(() => { bridge.packs().then(openPicker).catch(() => openPicker([])); }, 500);
 
