@@ -110,12 +110,7 @@
     });
     if (list.length === 0) items.push({ type: 'separator' }, { id: 'pack-', label: '还没装任何皮肤包', enabled: false });
     log('准备弹出选择器：' + list.length + ' 个包（当前 ' + (current || '内置') + '），items=' + items.length);
-    try {
-      bridge.menu({ items: items });
-      log('已把菜单交给主进程（下一步看主进程有没有报错）');
-    } catch (e) {
-      log('调 bridge.menu 就失败了：' + (e && e.message));
-    }
+    showPanel(items);
   }
 
   // 菜单回传：立即原地换肤 + 落盘（不重开窗口）
@@ -208,6 +203,66 @@
   window.addEventListener('unhandledrejection', (e) => {
     log('未处理的 Promise 拒绝：' + ((e && e.reason && (e.reason.message || e.reason)) || '?'));
   });
+
+  /* --------------------------- 自绘皮肤面板 --------------------------- */
+  // 原生菜单在 Windows 上会"显示但收不到点击"，所以自己画一个。
+  let panelEl = null;
+  let panelBoxTimer = null;
+
+  function closePanel() {
+    if (panelEl && panelEl.parentNode) panelEl.parentNode.removeChild(panelEl);
+    panelEl = null;
+    if (panelBoxTimer) { clearInterval(panelBoxTimer); panelBoxTimer = null; }
+    if (bridge.reportBoxNow) bridge.reportBoxNow();
+  }
+
+  function showPanel(items) {
+    closePanel();
+    const el = document.createElement('div');
+    el.style.cssText = [
+      'position:absolute', 'left:150px', 'top:250px', 'width:200px', 'max-height:300px',
+      'overflow-y:auto', 'background:rgba(18,26,36,0.96)', 'border:1px solid rgba(150,200,255,0.35)',
+      'border-radius:10px', 'padding:6px', 'z-index:2147483647', 'pointer-events:auto',
+      'font:12px/1.6 "Segoe UI","Microsoft YaHei",sans-serif', 'color:#dce9f7',
+    ].join(';');
+    for (const it of items) {
+      if (!it || it.type === 'separator') {
+        const hr = document.createElement('div');
+        hr.style.cssText = 'height:1px;background:rgba(150,200,255,0.2);margin:5px 2px';
+        el.appendChild(hr);
+        continue;
+      }
+      const row = document.createElement('div');
+      row.textContent = (it.checked ? '✓ ' : '　') + String(it.label || '');
+      row.style.cssText = 'padding:3px 6px;border-radius:6px;cursor:pointer' + (it.enabled === false ? ';opacity:0.4' : '');
+      row.addEventListener('mouseenter', () => { row.style.background = 'rgba(90,150,220,0.35)'; });
+      row.addEventListener('mouseleave', () => { row.style.background = 'transparent'; });
+      row.addEventListener('click', (ev) => {
+        ev.stopPropagation();
+        log('面板点击：' + it.id);
+        if (it.id === 'pack-install') { closePanel(); bridge.installPack().then((r) => log('导入结果 ' + JSON.stringify(r))); return; }
+        const next = String(it.id || '').replace(/^pack-/, '');
+        closePanel();
+        const ok = usePack(next, '面板');
+        bridge.setPack(ok ? next : '');
+      });
+      el.appendChild(row);
+    }
+    document.body.appendChild(el);
+    panelEl = el;
+    log('自绘面板已显示，' + items.length + ' 行');
+    // 面板期间持续上报命中区（覆盖渲染进程自己的包围盒），否则点击穿不透
+    panelBoxTimer = setInterval(() => {
+      if (!panelEl || !bridge.setBox) return;
+      const r = panelEl.getBoundingClientRect();
+      bridge.setBox({ x: Math.round(r.left), y: Math.round(r.top), w: Math.round(r.width), h: Math.round(r.height) });
+    }, 150);
+  }
+
+  // 测试钩子：启动即打开面板（截图与合成点击验证用）
+  if (new URLSearchParams(location.search).get('packpanel') === '1') {
+    setTimeout(() => { bridge.packs().then((all) => { list = Array.isArray(all) ? all : []; openPicker(list); }); }, 2500);
+  }
 
   boot();
   if (wantPicker) setTimeout(() => { bridge.packs().then(openPicker).catch(() => openPicker([])); }, 500);
