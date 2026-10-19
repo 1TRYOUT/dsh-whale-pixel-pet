@@ -363,6 +363,11 @@ let dragLock = false;
 
 /** 🎨 按钮的矩形（窗口内坐标，与 packs-ui.js 保持一致） */
 const PACK_BUTTON = { x: 284, y: 414, w: 30, h: 26 };
+let panelRect = null;   // 自绘皮肤面板的矩形（渲染进程上报）；不覆盖她的包围盒
+ipcMain.on('pet:panel-rect', (_e, r) => {
+  panelRect = (r && r.w > 0 && r.h > 0) ? { x: r.x, y: r.y, w: r.w, h: r.h } : null;
+  console.log('[panel] rect=' + (panelRect ? panelRect.x + ',' + panelRect.y + ' ' + panelRect.w + 'x' + panelRect.h : 'cleared'));
+});
 
 function cursorOverPet() {
   // 按钮区域永远算"在她身上"：否则换皮肤后包围盒一变，按钮就点不到（穿透到桌面）
@@ -373,6 +378,7 @@ function cursorOverPet() {
       const bx = bp.x - bwx, by = bp.y - bwy;
       if (bx >= PACK_BUTTON.x - 4 && bx <= PACK_BUTTON.x + PACK_BUTTON.w + 4 &&
           by >= PACK_BUTTON.y - 4 && by <= PACK_BUTTON.y + PACK_BUTTON.h + 4) return true;
+  if (panelRect && bx >= panelRect.x && bx <= panelRect.x + panelRect.w && by >= panelRect.y && by <= panelRect.y + panelRect.h) return true;
     } catch (e) { /* ignore */ }
   }
   if (!petBox || !win || win.isDestroyed()) return false;
