@@ -213,7 +213,7 @@
     if (panelEl && panelEl.parentNode) panelEl.parentNode.removeChild(panelEl);
     panelEl = null;
     if (panelBoxTimer) { clearInterval(panelBoxTimer); panelBoxTimer = null; }
-    if (bridge.reportBoxNow) bridge.reportBoxNow();
+    try { if (bridge.panelRect) bridge.panelRect(null); } catch (e) { /* ignore */ }   // 清掉面板矩形，别影响她的包围盒
   }
 
   function showPanel(items) {
@@ -239,7 +239,7 @@
       row.addEventListener('mouseleave', () => { row.style.background = 'transparent'; });
       row.addEventListener('click', (ev) => {
         ev.stopPropagation();
-        log('面板点击：' + it.id);
+        log('[panel] click id=' + it.id);
         if (it.id === 'pack-install') { closePanel(); bridge.installPack().then((r) => log('导入结果 ' + JSON.stringify(r))); return; }
         const next = String(it.id || '').replace(/^pack-/, '');
         closePanel();
@@ -250,13 +250,15 @@
     }
     document.body.appendChild(el);
     panelEl = el;
-    log('自绘面板已显示，' + items.length + ' 行');
+    log('[panel] shown rows=' + items.length);
     // 面板期间持续上报命中区（覆盖渲染进程自己的包围盒），否则点击穿不透
-    panelBoxTimer = setInterval(() => {
-      if (!panelEl || !bridge.setBox) return;
+    const reportRect = () => {
+      if (!panelEl || !bridge.panelRect) return;
       const r = panelEl.getBoundingClientRect();
-      bridge.setBox({ x: Math.round(r.left), y: Math.round(r.top), w: Math.round(r.width), h: Math.round(r.height) });
-    }, 150);
+      bridge.panelRect({ x: Math.round(r.left), y: Math.round(r.top), w: Math.round(r.width), h: Math.round(r.height) });
+    };
+    reportRect();
+    panelBoxTimer = setInterval(reportRect, 300);
   }
 
   // 测试钩子：启动即打开面板（截图与合成点击验证用）

@@ -24,6 +24,8 @@ contextBridge.exposeInMainWorld('petBridge', {
   installPack: () => ipcRenderer.invoke('pet:pack:install'),
   /** 按路径导入（拖拽用） */
   installPackPath: (src) => ipcRenderer.invoke('pet:pack:install-path', src),
+  /** 上报自绘面板矩形（主进程据此放宽命中区，不去动她的包围盒） */
+  panelRect: (r) => ipcRenderer.send('pet:panel-rect', r),
   /** 拖进来的文件/文件夹取真实路径：Electron 32+ 已移除 File.path，必须用 webUtils */
   pathForFile: (file) => {
     try {
