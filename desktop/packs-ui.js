@@ -266,6 +266,12 @@
     setTimeout(() => { bridge.packs().then((all) => { list = Array.isArray(all) ? all : []; openPicker(list); }); }, 2500);
   }
 
+  /* --------------------- 拖动结束的多重兜底（防吸附） --------------------- */
+  const endDrag = () => { try { if (bridge.dragEnd) bridge.dragEnd(); } catch (e) { /* ignore */ } };
+  ['pointerup', 'pointercancel', 'blur'].forEach((type) => window.addEventListener(type, endDrag, true));
+  window.addEventListener('pointerleave', endDrag, true);
+  window.addEventListener('mouseleave', endDrag, true);
+
   boot();
   if (wantPicker) setTimeout(() => { bridge.packs().then(openPicker).catch(() => openPicker([])); }, 500);
 
