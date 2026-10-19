@@ -701,7 +701,7 @@ ipcMain.handle('pet:packs', () => {
       const manifest = path.join(dir, id, 'manifest.json');
       if (!fs.existsSync(manifest)) continue;
       try {
-        out.push({ id: id, manifest: JSON.parse(fs.readFileSync(manifest, 'utf8')) });
+        out.push({ id: id, manifest: JSON.parse(fs.readFileSync(manifest, 'utf8').replace(/^\uFEFF/, '')) });
       } catch (e) {
         debugLog('立绘包解析失败 ' + id + ': ' + (e && e.message));
       }

@@ -29,7 +29,7 @@ for (const id of readdirSync(packsDir)) {
   if (!existsSync(mf)) { console.log('  -  ' + id + ' 跳过（没有 manifest.json）'); continue; }
   total++;
   let manifest;
-  try { manifest = JSON.parse(readFileSync(mf, 'utf8')); }
+  try { manifest = JSON.parse(readFileSync(mf, 'utf8').replace(/^\uFEFF/, '')); }
   catch (e) { console.log('  X  ' + id + ' manifest.json 不是合法 JSON: ' + e.message); bad++; continue; }
 
   const r = P.validate(manifest);
