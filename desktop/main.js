@@ -606,7 +606,18 @@ setInterval(() => {
 }, 3000);
 
 if (process.env.DSH_PET_WALK === '1') {
-  setTimeout(() => { if (win && !win.isDestroyed()) win.webContents.send('pet:action', 'walk'); }, 4000);
+  setTimeout(() => {
+    // 直接触发自己的 pet:walk 处理器（ipcMain 是 EventEmitter），
+    // 并且**朝有屏的那一边**走——上一版发给渲染进程，方向随机，测了个空。
+    try {
+      const [x0, y0] = win && !win.isDestroyed() ? win.getPosition() : [0, 0];
+      const cur = screen.getDisplayNearestPoint({ x: x0, y: y0 });
+      const right = screen.getAllDisplays().some((d) => d.id !== cur.id && d.workArea.x >= cur.workArea.x + cur.workArea.width - 40);
+      const dir = right ? 1 : -1;
+      debugLog('钩子：强制跨屏散步 dir=' + dir + '（' + (right ? '右边有屏' : '左边有屏') + '）');
+      ipcMain.emit('pet:walk', null, { dir: dir, cross: true });
+    } catch (e) { debugLog('钩子触发失败: ' + (e && e.message)); }
+  }, 4000);
 }
 
 ipcMain.on('pet:reset-pos', resetPos);
