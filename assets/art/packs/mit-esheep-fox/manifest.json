@@ -1,0 +1,12 @@
+{
+  "name": "eSheep · fox（MIT）",
+  "author": "Adrianotiger/desktopPet — MIT",
+  "poses": {
+    "idle": "idle.png",
+    "sleep": "sleep.png",
+    "walk": "walk.png",
+    "groom": "groom.png",
+    "sad": "sad.png"
+  },
+  "hints": {}
+}

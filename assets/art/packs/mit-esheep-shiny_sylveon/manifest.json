@@ -1,0 +1,10 @@
+{
+  "name": "eSheep · shiny_sylveon（MIT）",
+  "author": "Adrianotiger/desktopPet — MIT",
+  "poses": {
+    "idle": "idle.png",
+    "groom": "groom.png",
+    "sad": "sad.png"
+  },
+  "hints": {}
+}
