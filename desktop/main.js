@@ -720,6 +720,7 @@ ipcMain.on('pet:menu', (_e, spec) => {
   debugLog('收到菜单请求，items=' + ((spec && spec.items) ? spec.items.length : 0));
   if (!win || win.isDestroyed()) return;
   const items = (spec && Array.isArray(spec.items)) ? spec.items : [];
+  try { console.log('[menu] 项目: ' + items.map((i) => (i.type || 'normal') + ':' + String(i.label || '')).join(' | ')); } catch (e) { /* ignore */ }
   const send = (id) => { if (win && !win.isDestroyed()) win.webContents.send('pet:action', id); };
 
   const build = (list) => list.map((it) => {
