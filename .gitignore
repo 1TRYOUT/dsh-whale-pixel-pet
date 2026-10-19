@@ -18,3 +18,7 @@ desktop.ini
 
 # 本地皮肤包：只在你机器上用，不进仓库（放第三方/自用素材）
 assets/art/packs/local-*/
+
+# 我用的临时补丁脚本（一次性，不该进仓库）
+tools/.fix-*
+tools/.probe*
