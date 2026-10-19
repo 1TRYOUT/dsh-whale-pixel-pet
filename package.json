@@ -20,7 +20,7 @@
     "cordis.patch.yml"
   ],
   "scripts": {
-    "test": "node --test test/engine.test.mjs test/art.test.mjs test/actions.test.mjs test/status.test.mjs test/host.test.mjs"
+    "test": "node --test test/engine.test.mjs test/art.test.mjs test/actions.test.mjs test/status.test.mjs test/host.test.mjs test/desktop-main.test.mjs test/desktop-renderer.test.mjs"
   },
   "license": "MIT",
   "author": "1TRYOUT",
