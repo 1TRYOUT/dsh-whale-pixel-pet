@@ -22,6 +22,16 @@ contextBridge.exposeInMainWorld('petBridge', {
   setPack: (id) => ipcRenderer.invoke('pet:pack:set', id),
   /** 一键导入本地皮肤：选目录 → 复制成 packs/local-<名字>/（不进 git） */
   installPack: () => ipcRenderer.invoke('pet:pack:install'),
+  /** 按路径导入（拖拽用） */
+  installPackPath: (src) => ipcRenderer.invoke('pet:pack:install-path', src),
+  /** 拖进来的文件/文件夹取真实路径：Electron 32+ 已移除 File.path，必须用 webUtils */
+  pathForFile: (file) => {
+    try {
+      const { webUtils } = require('electron');
+      if (webUtils && webUtils.getPathForFile) return webUtils.getPathForFile(file);
+    } catch (e) { /* 回退 */ }
+    return (file && file.path) || '';
+  },
   /**
    * 测试钩子用的环境变量透传（脚本可确定性验证，不用合成鼠标去点像素）。
    * 沙箱里 process.env 不可用时返回空值——那就只剩 URL 参数那条路。

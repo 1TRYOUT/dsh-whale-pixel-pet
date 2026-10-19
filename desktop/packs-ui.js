@@ -171,6 +171,36 @@
     } catch (e) { /* ignore */ }
   }, 1000);
 
+  /* ------------------------------ 拖拽导入皮肤 ------------------------------ */
+  // 窗口默认是穿透的，但指针悬停在她身上时主进程会临时关掉穿透，
+  // 所以把文件夹拖到她身上时 drop 能落到这里。
+  window.addEventListener('dragover', (e) => {
+    e.preventDefault();
+    if (e.dataTransfer) e.dataTransfer.dropEffect = 'copy';
+  });
+  window.addEventListener('drop', (e) => {
+    e.preventDefault();
+    const files = (e.dataTransfer && e.dataTransfer.files) ? Array.from(e.dataTransfer.files) : [];
+    if (!files.length) return;
+    const paths = files.map((f) => (bridge.pathForFile ? bridge.pathForFile(f) : '')).filter(Boolean);
+    log('拖入 ' + files.length + ' 项，可解析路径 ' + paths.length + ' 个');
+    if (!paths.length) { pet.say('拿不到路径…', 2.4); return; }
+    let done = 0;
+    paths.forEach((p) => {
+      bridge.installPackPath(p).then((r) => {
+        if (r && r.ok) {
+          done++;
+          log('拖拽导入成功：' + r.id + '（' + r.files + ' 个文件）');
+          pet.say('装上啦～', 2.4);
+          bridge.packs().then((all) => { list = Array.isArray(all) ? all : []; openPicker(list); });
+        } else {
+          log('拖拽导入失败：' + ((r && r.error) || '未知'));
+          pet.say('这个装不上…', 2.4);
+        }
+      }).catch((err) => log('拖拽导入出错：' + (err && err.message)));
+    });
+  });
+
   boot();
   if (wantPicker) setTimeout(() => { bridge.packs().then(openPicker).catch(() => openPicker([])); }, 500);
 

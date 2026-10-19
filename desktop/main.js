@@ -607,6 +607,42 @@ const PACK_FILE = path.join(path.dirname(STATE_FILE), 'pack.json');
  * 用 local- 前缀是关键——.gitignore 忽略 local-*，所以第三方/自用素材不会被提交，
  * 功能上和仓库内的包完全一样。
  */
+/**
+ * 按路径导入皮肤（拖拽用）：与对话框版同样的校验与复制，
+ * 但路径由渲染进程给（Electron 32+ 拿不到 File.path，必须走 webUtils）。
+ */
+function installPackFromDir(src) {
+  try {
+    if (!src || !fs.existsSync(src)) return { ok: false, error: '路径不存在' };
+    if (!fs.existsSync(path.join(src, 'manifest.json'))) return { ok: false, error: '这个文件夹里没有 manifest.json' };
+    const raw = path.basename(src).replace(/[^\w\u4e00-\u9fa5-]+/g, '-').replace(/^-+|-+$/g, '');
+    const name = (raw || 'pack').slice(0, 40);
+    const dest = path.join(__dirname, '..', 'assets', 'art', 'packs', 'local-' + name);
+    fs.mkdirSync(dest, { recursive: true });
+    let copied = 0;
+    for (const entry of fs.readdirSync(src)) {
+      const from = path.join(src, entry);
+      try {
+        if (!fs.statSync(from).isFile()) continue;
+        fs.copyFileSync(from, path.join(dest, entry));
+        copied++;
+      } catch (e) { /* 单个文件失败不中断 */ }
+    }
+    console.log('[install] 已导入 local-' + name + '（' + copied + ' 个文件）');
+    return { ok: true, id: 'local-' + name, files: copied };
+  } catch (e) {
+    console.log('[install] 导入失败: ' + (e && e.message));
+    return { ok: false, error: String((e && e.message) || e) };
+  }
+}
+
+ipcMain.handle('pet:pack:install-path', (_e, src) => installPackFromDir(String(src || '')));
+
+// 测试钩子：启动时按路径导入一次（确定性验证，不需要真的拖拽）
+if (process.env.DSH_PET_INSTALL_PATH) {
+  setTimeout(() => { installPackFromDir(process.env.DSH_PET_INSTALL_PATH); }, 3000);
+}
+
 ipcMain.handle('pet:pack:install', async () => {
   try {
     const { dialog } = require('electron');
