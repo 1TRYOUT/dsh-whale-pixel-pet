@@ -205,9 +205,11 @@ function refreshTray() {
     } catch (e) { debugLog('显示状态失败: ' + (e && e.message)); }
   };
 
-  const skinCount = skinSubmenu().length;
-  debugLog('托盘菜单：皮肤 ' + skinCount + ' 项，皮肤当前=' + (currentPackId() || '内置'));
+  let skinCount = 0;
+  try { skinCount = skinSubmenu().length; } catch (e) { console.log('[tray] skinSubmenu 失败: ' + (e && e.message)); }
+  console.log('[tray] 皮肤 ' + skinCount + ' 项，当前=' + (currentPackId() || '内置'));
 
+  console.log('[tray] 准备构建菜单');
   tray.setContextMenu(Menu.buildFromTemplate([
     { label: visible ? '藏起来' : '叫她出来', click: toggleVisible },
     { type: 'separator' },
@@ -224,6 +226,7 @@ function refreshTray() {
     { type: 'separator' },
     { label: '退出桌宠', click: () => { quitting = true; app.quit(); } },
   ]));
+  console.log('[tray] 菜单已设置');
 }
 
 function toggleVisible() {
@@ -680,6 +683,7 @@ if (process.env.DSH_PET_WALK === '1') {
 ipcMain.on('pet:reset-pos', resetPos);
 
 ipcMain.on('pet:menu', (_e, spec) => {
+  console.log('[menu] 收到菜单请求 items=' + ((spec && spec.items) ? spec.items.length : 0));
   debugLog('收到菜单请求，items=' + ((spec && spec.items) ? spec.items.length : 0));
   if (!win || win.isDestroyed()) return;
   const items = (spec && Array.isArray(spec.items)) ? spec.items : [];
