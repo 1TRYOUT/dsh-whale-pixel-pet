@@ -339,7 +339,20 @@ function debugLog(msg) {
 let petBox = null;         // 渲染进程上报的她的大致包围盒（窗口内坐标）
 let dragLock = false;
 
+/** 🎨 按钮的矩形（窗口内坐标，与 packs-ui.js 保持一致） */
+const PACK_BUTTON = { x: 284, y: 414, w: 30, h: 26 };
+
 function cursorOverPet() {
+  // 按钮区域永远算"在她身上"：否则换皮肤后包围盒一变，按钮就点不到（穿透到桌面）
+  if (win && !win.isDestroyed()) {
+    try {
+      const bp = screen.getCursorScreenPoint();
+      const [bwx, bwy] = win.getPosition();
+      const bx = bp.x - bwx, by = bp.y - bwy;
+      if (bx >= PACK_BUTTON.x - 4 && bx <= PACK_BUTTON.x + PACK_BUTTON.w + 4 &&
+          by >= PACK_BUTTON.y - 4 && by <= PACK_BUTTON.y + PACK_BUTTON.h + 4) return true;
+    } catch (e) { /* ignore */ }
+  }
   if (!petBox || !win || win.isDestroyed()) return false;
   let pt;
   try { pt = screen.getCursorScreenPoint(); } catch (e) { return false; }
