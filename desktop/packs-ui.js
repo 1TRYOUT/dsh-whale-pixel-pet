@@ -260,7 +260,9 @@
   }
 
   // 测试钩子：启动即打开面板（截图与合成点击验证用）
-  if (new URLSearchParams(location.search).get('packpanel') === '1') {
+  // 复用应用已支持的 panel=1（main 只会加 debug/panel 两个查询参数）
+  if (new URLSearchParams(location.search).get('packpanel') === '1' ||
+      new URLSearchParams(location.search).get('panel') === '1') {
     setTimeout(() => { bridge.packs().then((all) => { list = Array.isArray(all) ? all : []; openPicker(list); }); }, 2500);
   }
 
