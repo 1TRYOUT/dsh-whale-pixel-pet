@@ -140,14 +140,15 @@
     over = zoneAtEvent(e) !== null;
 
     if (down) {
-      const dx = e.clientX - lastPt.x;
-      const dy = e.clientY - lastPt.y;
+      // 窗口也在跟随光标，client 坐标可能不变；用屏幕坐标区分点击与拖动。
+      const dx = e.screenX - lastPt.x;
+      const dy = e.screenY - lastPt.y;
       moved += Math.abs(dx) + Math.abs(dy);
       if (moved > 4) {
         dragging = true;
         // 移动由主进程的 dragStart 轮询负责（见 main.js），这里不再发增量
       }
-      lastPt = { x: e.clientX, y: e.clientY };
+      lastPt = { x: e.screenX, y: e.screenY };
     }
   }, { passive: true });
 
@@ -160,19 +161,20 @@
     down = true;
     dragging = false;
     moved = 0;
-    lastPt = { x: e.clientX, y: e.clientY };
+    lastPt = { x: e.screenX, y: e.screenY };
     bridge.setDragLock(true);       // 拖动期间不许穿透
-      bridge.dragStart();            // 交给主进程按光标拖（跨屏不会因为光标跑出窗口而断）
+    bridge.dragStart();             // 交给主进程按光标拖（跨屏不会因为光标跑出窗口而断）
     e.preventDefault();
   });
 
   window.addEventListener('pointerup', (e) => {
     if (!down) return;
+    moved += Math.abs(e.screenX - lastPt.x) + Math.abs(e.screenY - lastPt.y);
+    if (moved > 4) dragging = true;
     down = false;
+    bridge.dragEnd();               // 点击也启动了主进程跟随，松手时一并结束
     bridge.setDragLock(false);
-    if (dragging) {
-      bridge.dragEnd();
-    } else {
+    if (!dragging) {
       const zone = pet.hitZone(e.clientX, e.clientY) || 'head';
       // 走共用动作层，和 DSH 窗口版完全同一套反应
       if (A) A.run('pat', { pet: pet, audio: audio });
@@ -181,6 +183,17 @@
     dragging = false;
     over = pet.hitZone(e.clientX, e.clientY) !== null;
   });
+
+  function cancelDrag() {
+    if (!down) return;
+    down = false;
+    dragging = false;
+    moved = 0;
+    bridge.dragEnd();
+    bridge.setDragLock(false);
+  }
+  window.addEventListener('pointercancel', cancelDrag);
+  window.addEventListener('blur', cancelDrag);
 
   window.addEventListener('contextmenu', (e) => {
     if (panelOpen) return;                       // 面板里用右键保持浏览器行为

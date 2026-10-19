@@ -149,7 +149,10 @@ function createWindow() {
     pushState(true);
   });
   win.on('moved', savePos);
-  win.on('closed', () => { if (hoverTimer) clearInterval(hoverTimer); });
+  win.on('hide', endDrag);
+  win.on('closed', () => { endDrag(); if (hoverTimer) clearInterval(hoverTimer); });
+  win.webContents.on('render-process-gone', endDrag);
+  win.webContents.on('did-start-loading', endDrag);
   // 关窗 = 收进托盘，不真的退出
   win.on('close', (e) => {
     if (!quitting) { e.preventDefault(); win.hide(); refreshTray(); }
@@ -360,11 +363,18 @@ ipcMain.on('pet:drag', (_e, d) => {
   win.setPosition(p.x, p.y);
 });
 
-ipcMain.on('pet:drag-end', () => {
+function endDrag() {
+  const wasDragging = !!(dragTimer || dragOffset || dragLock);
   if (dragTimer) { clearInterval(dragTimer); dragTimer = null; }
   dragOffset = null;
-  savePos();
-});
+  dragLock = false;
+  if (wasDragging) {
+    syncIgnore();
+    savePos();
+  }
+}
+
+ipcMain.on('pet:drag-end', endDrag);
 
 /** 反向通道：桌面 -> 宿主（宿主轮询这个文件），因为桌面进程拿不到 /api 鉴权 */
 const COMMAND_FILE = path.join(path.dirname(STATE_FILE), 'command.json');
@@ -658,5 +668,5 @@ if (!gotLock) {
   });
   app.on('window-all-closed', () => { /* 托盘常驻，不退出 */ });
   app.on('will-quit', () => { unregisterPid(); });
-  app.on('before-quit', () => { quitting = true; if (pollTimer) clearInterval(pollTimer); });
+  app.on('before-quit', () => { quitting = true; endDrag(); if (pollTimer) clearInterval(pollTimer); });
 }
