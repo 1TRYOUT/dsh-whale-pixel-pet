@@ -159,11 +159,68 @@ function createWindow() {
 function refreshTray() {
   if (!tray) return;
   const visible = !!(win && !win.isDestroyed() && win.isVisible());
+  /** 把动作发给渲染进程（复用已有的 onAction 通道） */
+  const sendAction = (id) => { if (win && !win.isDestroyed()) win.webContents.send('pet:action', id); };
+
+  /** 当前皮肤 id（读 pack.json，和渲染进程用同一份） */
+  const currentPackId = () => {
+    try { return JSON.parse(fs.readFileSync(PACK_FILE, 'utf8')).id || ''; } catch (e) { return ''; }
+  };
+
+  /** 皮肤子菜单：主进程自己扫目录，不经过那条不可靠的菜单 IPC */
+  const skinSubmenu = () => {
+    const items = [{ label: '内置立绘', type: 'radio', checked: !currentPackId(), click: () => sendAction('pack-') }];
+    try {
+      const dir = path.join(__dirname, '..', 'assets', 'art', 'packs');
+      for (const id of fs.readdirSync(dir)) {
+        const mf = path.join(dir, id, 'manifest.json');
+        if (!fs.existsSync(mf)) continue;
+        let name = id;
+        try { name = JSON.parse(fs.readFileSync(mf, 'utf8')).name || id; } catch (e) { /* ignore */ }
+        items.push({ label: name, type: 'radio', checked: currentPackId() === id, click: () => sendAction('pack-' + id) });
+      }
+    } catch (e) { /* 没装皮肤包 */ }
+    items.push({ type: 'separator' }, { label: '➕ 导入本地皮肤…', click: () => sendAction('pack-install') });
+    return items;
+  };
+
+  /** 她的状态：主进程自己读状态文件，不依赖渲染进程 */
+  const showStatus = () => {
+    try {
+      const { dialog } = require('electron');
+      let s = {};
+      try { s = JSON.parse(fs.readFileSync(STATE_FILE, 'utf8')); } catch (e) { s = {}; }
+      const pos = (win && !win.isDestroyed()) ? win.getPosition().join(', ') : '-';
+      dialog.showMessageBox({
+        type: 'info', title: '鲸鱼娘', message: '她现在这样',
+        detail: [
+          '皮肤：' + (currentPackId() || '内置立绘'),
+          '位置：' + pos,
+          'DSH：' + (s.hostRunning ? '运行中' : '没连上'),
+          '任务：' + ((s.task && s.task.text) || '空闲'),
+          '进度：' + ((s.progress && s.progress.text) || '-'),
+          '用量：' + ((s.usage && s.usage.text) || '-'),
+        ].join('\n'),
+      });
+    } catch (e) { debugLog('显示状态失败: ' + (e && e.message)); }
+  };
+
+  const skinCount = skinSubmenu().length;
+  debugLog('托盘菜单：皮肤 ' + skinCount + ' 项，皮肤当前=' + (currentPackId() || '内置'));
+
   tray.setContextMenu(Menu.buildFromTemplate([
     { label: visible ? '藏起来' : '叫她出来', click: toggleVisible },
+    { type: 'separator' },
+    { label: '🎨 换皮肤', submenu: skinSubmenu() },
+    { label: '🍰 喂点东西', click: () => sendAction('feed') },
+    { label: '🤚 摸摸头', click: () => sendAction('pat') },
+    { label: '🚶 去散步', click: () => sendAction('walk') },
+    { label: '💤 让她睡', click: () => sendAction('sleep') },
+    { label: '📊 她的状态', click: showStatus },
+    { type: 'separator' },
     { label: '回到右下角', click: resetPos },
     { type: 'separator' },
-    { label: '打开 DSH', click: () => { shell.openExternal('http://127.0.0.1:19387').catch(() => {}); } },
+    { label: '打开 DSH', click: () => { shell.openExternal(process.env.DSH_PET_GUI_URL || 'http://127.0.0.1:19387').catch(() => {}); } },   // 端口会变，可用 DSH_PET_GUI_URL 覆盖
     { type: 'separator' },
     { label: '退出桌宠', click: () => { quitting = true; app.quit(); } },
   ]));
@@ -643,6 +700,14 @@ ipcMain.on('pet:menu', (_e, spec) => {
   // 兜底：清单为空时至少留一个能退出的菜单
   const template = items.length ? build(items) : [
     { label: '显示 / 隐藏', click: toggleVisible },
+    { type: 'separator' },
+    { label: '🎨 换皮肤', submenu: skinSubmenu() },
+    { label: '🍰 喂点东西', click: () => sendAction('feed') },
+    { label: '🤚 摸摸头', click: () => sendAction('pat') },
+    { label: '🚶 去散步', click: () => sendAction('walk') },
+    { label: '💤 让她睡', click: () => sendAction('sleep') },
+    { label: '📊 她的状态', click: showStatus },
+    { type: 'separator' },
     { label: '回到右下角', click: resetPos },
     { type: 'separator' },
     { label: '退出桌宠', click: () => { quitting = true; app.quit(); } },
