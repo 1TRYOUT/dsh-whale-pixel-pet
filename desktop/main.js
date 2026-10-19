@@ -851,6 +851,14 @@ setInterval(() => {
 
 ipcMain.on('pet:reset-pos', resetPos);
 
+/* 菜单打开期间冻结穿透切换：否则 hover 轮询会跟原生菜单抢输入 */
+let menuOpen = false;
+const __syncIgnoreBefore = syncIgnore;
+syncIgnore = function () {
+  if (menuOpen) return;
+  return __syncIgnoreBefore.apply(this, arguments);
+};
+
 ipcMain.on('pet:menu', (_e, spec) => {
   console.log('[menu] 收到菜单请求 items=' + ((spec && spec.items) ? spec.items.length : 0));
   debugLog('收到菜单请求，items=' + ((spec && spec.items) ? spec.items.length : 0));
@@ -863,12 +871,14 @@ ipcMain.on('pet:menu', (_e, spec) => {
     win.setAlwaysOnTop(false);
     win.setIgnoreMouseEvents(false);
     console.log('[menu] 弹出前：已临时关掉置顶与穿透');
+    menuOpen = true;
   } catch (e) { console.log('[menu] 降级失败: ' + (e && e.message)); }
   setTimeout(() => {
     try {
       if (win && !win.isDestroyed()) {
         win.setAlwaysOnTop(true, 'screen-saver');
         if (typeof syncIgnore === 'function') syncIgnore();
+        menuOpen = false;
         console.log('[menu] 已恢复置顶与穿透');
       }
     } catch (e) { console.log('[menu] 恢复失败: ' + (e && e.message)); }
