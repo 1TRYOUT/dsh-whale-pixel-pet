@@ -147,7 +147,27 @@ function createWindow() {
   win.once('ready-to-show', () => {
     win.show();
     pushState(true);
-    registerHotkeys();          // 必须在 app ready 之后（顶层调用会报 cannot be used before the app is ready）
+    /* --------------------------- 陪伴报告 --------------------------- */
+// 每 30 秒记一次：窗口可见才算"在陪"。落盘，重启不清零。
+const CARE_FILE = path.join(path.dirname(STATE_FILE), 'care.json');
+let care = { totalSec: 0, todaySec: 0, day: '', firstAt: Date.now() };
+try { care = Object.assign(care, JSON.parse(fs.readFileSync(CARE_FILE, 'utf8'))); } catch (e) { /* 首次运行 */ }
+function saveCare() { try { fs.writeFileSync(CARE_FILE, JSON.stringify(care), 'utf8'); } catch (e) { /* ignore */ } }
+function fmtMin(sec) {
+  const m = Math.floor(sec / 60);
+  if (m < 60) return m + ' 分钟';
+  return Math.floor(m / 60) + ' 小时 ' + (m % 60) + ' 分钟';
+}
+setInterval(() => {
+  const day = new Date().toISOString().slice(0, 10);
+  if (care.day !== day) { care.day = day; care.todaySec = 0; }
+  if (win && !win.isDestroyed() && win.isVisible()) { care.totalSec += 30; care.todaySec += 30; }
+  saveCare();
+  if (care.totalSec % 600 === 0) console.log('[care] 累计陪伴 ' + fmtMin(care.totalSec) + '（今天 ' + fmtMin(care.todaySec) + '）');
+}, 30000);
+setTimeout(() => console.log('[care] 陪伴计时已启动，当前累计 ' + fmtMin(care.totalSec) + '，今天 ' + fmtMin(care.todaySec)), 2000);
+
+registerHotkeys();          // 必须在 app ready 之后（顶层调用会报 cannot be used before the app is ready）
   });
   win.on('moved', savePos);
   win.on('closed', () => { if (hoverTimer) clearInterval(hoverTimer); });
@@ -221,6 +241,7 @@ function refreshTray() {
           '任务：' + ((s.task && s.task.text) || '空闲'),
           '进度：' + ((s.progress && s.progress.text) || '-'),
           '用量：' + ((s.usage && s.usage.text) || '-'),
+          '陪伴：累计 ' + fmtMin(care.totalSec) + '，今天 ' + fmtMin(care.todaySec),
         ].join('\n'),
       });
     } catch (e) { debugLog('显示状态失败: ' + (e && e.message)); }
@@ -723,27 +744,30 @@ if (process.env.DSH_PET_WALK === '1') {
 function registerHotkeys() {
   const { globalShortcut } = require('electron');
   const sendAction = (id) => { if (win && !win.isDestroyed()) win.webContents.send('pet:action', id); };
+  // 每个动作给一串候选：前一个被别的程序占用就试下一个
   const map = [
-    ['Control+Alt+W', '叫她出来 / 藏起来', () => toggleVisible()],
-    ['Control+Alt+F', '喂点东西', () => sendAction('feed')],
-    ['Control+Alt+R', '回到右下角', () => resetPos()],
-    ['Control+Alt+S', '让她睡', () => sendAction('sleep')],
+    ['叫她出来 / 藏起来', () => toggleVisible(), ['Control+Alt+W', 'Control+Shift+W', 'Alt+Shift+W']],
+    ['喂点东西', () => sendAction('feed'), ['Control+Alt+F', 'Control+Shift+F', 'Alt+Shift+F']],
+    ['回到右下角', () => resetPos(), ['Control+Alt+R', 'Control+Shift+R', 'Alt+Shift+R']],
+    ['让她睡', () => sendAction('sleep'), ['Control+Alt+S', 'Control+Shift+S', 'Alt+Shift+S']],
   ];
   const ok = [];
   const fail = [];
-  for (const [accel, label, fn] of map) {
-    try {
-      const registered = globalShortcut.register(accel, fn);
-      if (registered) ok.push(accel + '(' + label + ')');
-      else fail.push(accel);
-    } catch (e) { fail.push(accel + ':' + (e && e.message)); }
+  for (const [label, fn, accels] of map) {
+    let done = false;
+    for (const accel of accels) {
+      try {
+        if (globalShortcut.register(accel, fn)) { ok.push(accel + '(' + label + ')'); done = true; break; }
+      } catch (e) { /* 试下一个 */ }
+    }
+    if (!done) fail.push(label + '：' + accels.join('/') + ' 都被占用');
   }
   console.log('[hotkey] 已注册 ' + ok.length + ' 个：' + ok.join(' / '));
   if (fail.length) console.log('[hotkey] 注册失败：' + fail.join(' / '));
   const t = process.env.DSH_PET_HOTKEY_TEST;
   if (t) {
-    const hit = map.find(([accel]) => accel.toLowerCase().endsWith('+' + String(t).toLowerCase()));
-    if (hit) { console.log('[hotkey] 钩子触发 ' + hit[0]); setTimeout(hit[2], 3000); }
+    const hit = map.find(([, , accels]) => accels.some((a) => a.toLowerCase().endsWith('+' + String(t).toLowerCase())));
+    if (hit) { console.log('[hotkey] 钩子触发 ' + hit[0]); setTimeout(hit[1], 3000); }
     else console.log('[hotkey] 钩子找不到 ' + t);
   }
   return ok.length;
