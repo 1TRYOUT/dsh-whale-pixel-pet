@@ -931,6 +931,8 @@ if (!gotLock) {
 } else {
   app.on('second-instance', () => { if (win) { win.show(); refreshTray(); } });
   app.whenReady().then(() => {
+  Menu.setApplicationMenu(null);   // 不给她弹出 Electron 默认菜单的机会
+
     registerPid();
     createWindow();
     createTray();
