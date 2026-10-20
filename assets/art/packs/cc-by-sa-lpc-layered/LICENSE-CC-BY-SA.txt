@@ -1,3 +1,0 @@
-本目录图片由 LPC 多层素材合成（body:male + hair:afro/adult + torso:longsleeve/longsleeves/female.png）。
-来源：https://github.com/LiberatedPixelCup/Universal-LPC-Spritesheet-Character-Generator （Liberated Pixel Cup 社群作品）
-许可：CC-BY-SA 3.0 / GPL 3.0（此处按 CC-BY-SA 3.0 使用）。本目录图片及其修改版保持 CC-BY-SA，不适用仓库 MIT。

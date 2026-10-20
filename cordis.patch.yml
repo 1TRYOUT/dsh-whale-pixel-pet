@@ -1,9 +1,0 @@
-# dsh-whale-pixel-pet bundle patch —— 把像素鲸鱼娘桌宠叠加到 profile 组合上（零侵入）。
-# 单包双面（dsh.bundle + dsh.client）：
-#   · 宿主半边（lib/index.js）：注册 /api/dsh-whale-pixel-pet/assets 只读静态路由，
-#     把包内 assets（引擎 / 悬浮层 / 信号探测器 / 样式）供给浏览器；
-#   · 客户端半边（lib/client.js）：惰性 CJS 物化期注入样式与脚本，挂载悬浮层，
-#     注册「桌宠」设置栏目；全部资源本地加载，无外部请求、无遥测。
-- insert:
-    - id: dsh-whale-pixel-pet
-      name: dsh-whale-pixel-pet

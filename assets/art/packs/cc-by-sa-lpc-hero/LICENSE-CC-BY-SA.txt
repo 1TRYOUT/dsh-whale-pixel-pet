@@ -1,9 +1,0 @@
-本目录（立绘包 cc-by-sa-lpc-hero）的图片素材授权与仓库代码不同：
-
-- 来源：Universal LPC Spritesheet Character Generator
-  https://github.com/LiberatedPixelCup/Universal-LPC-Spritesheet-Character-Generator
-  原始素材：Liberated Pixel Cup（LPC）贡献者社群作品
-- 许可：CC-BY-SA 3.0 / GPL 3.0（双授权，此处按 CC-BY-SA 3.0 使用）
-- 署名：Liberated Pixel Cup contributors（各素材作者见上游仓库 CREDITS）
-- 说明：本目录内的图片及其修改版保持 CC-BY-SA 3.0，不适用仓库根目录的 MIT。
-  这是合法的混合授权：MIT 只覆盖代码。
