@@ -7,7 +7,7 @@
 # 用法：
 #   powershell -NoProfile -ExecutionPolicy Bypass -File .\start-pet.ps1
 
-$ErrorActionPreference = 'Stop'
+$ErrorActionPreference = 'Continue'
 $repo = $PSScriptRoot
 $appDir = Join-Path $repo 'desktop'
 $exe = Join-Path $env:LOCALAPPDATA 'dsh-whale-pet\runtime\electron.exe'
@@ -25,7 +25,9 @@ if (-not (Test-Path (Join-Path $appDir 'main.js'))) {
 $leftover = @(Get-Process electron -ErrorAction SilentlyContinue | Where-Object { $_.Path -eq $exe })
 if ($leftover.Count -gt 0) {
     Write-Host ("清理残留进程 {0} 个（按可执行文件路径匹配）" -f $leftover.Count) -ForegroundColor Yellow
-    foreach ($p in $leftover) { & taskkill /PID $p.Id /T /F 2>&1 | Out-Null }
+    foreach ($p in $leftover) {
+        try { & taskkill /PID $p.Id /T /F 2>&1 | Out-Null } catch { }
+    }
     Start-Sleep -Seconds 2
 }
 
